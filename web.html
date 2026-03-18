@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bandalac Ion Cristian</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=Bebas+Neue&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="web.css">
+</head>
+<body>
+
+<h1 class="heading option1">Bandalac Ion Cristian</h1>
+
+<!-- Persistent navbar — always on top, home button slides in on scroll -->
+<nav id="navbar">
+    <a class="nav-home" id="navHome" href="#" onclick="scrollToTop(event)">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 7L7 1L13 7" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7 1V13" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        Home
+    </a>
+    <div class="nav-links">
+        <a class="color-btn active" href="#about">About Me</a>
+        <a class="color-btn" href="#skills">Skills</a>
+        <a class="color-btn" href="#contact">Contact</a>
+    </div>
+</nav>
+
+<div class="scroll-hint" id="scrollHint">
+    <span>Scroll</span>
+    <div class="scroll-arrow"></div>
+</div>
+
+<div class="custom-cursor" id="customCursor"></div>
+
+<!-- Spacer: gives the fixed hero its scroll room without doubling the page -->
+<div style="height:100vh;pointer-events:none;"></div>
+
+<!-- SECTIONS -->
+<div id="sections-wrapper">
+    <section class="section" id="about">
+        <div class="section-inner">
+            <div class="section-label">01 — About Me</div>
+            <h2 class="section-title">Who I Am</h2>
+            <div class="about-grid">
+                <div class="about-text">
+                    <p>I’m Ion-Cristian Bandalac, a Computer Science student at Maastricht University with a strong interest in software development, problem-solving, and building practical projects. I enjoy turning ideas into real applications and continuously improving my skills through hands-on experience.</p>
+
+                    <p>I have worked on projects such as a self-driving robot with sensor-based navigation, a computer simulator written in C, and my own personal portfolio website. These experiences have helped me develop both technical knowledge and the ability to learn quickly and adapt to new challenges.</p>
+
+                    <p>Alongside my technical work, I have gained valuable experience in professional and customer-focused roles, which strengthened my communication, teamwork, and problem-solving skills. I work with languages such as C, C++, C#, Java, JavaScript, and HTML, and I am motivated to keep growing, learning, and building meaningful solutions in tech.</p>
+                </div>
+                <div class="about-aside">
+                    <div class="about-card"><div class="about-card-num">04+</div><div class="about-card-label">Years of experience</div></div>
+                    <div class="about-card"><div class="about-card-num">20+</div><div class="about-card-label">Projects completed</div></div>
+                    <div class="about-card"><div class="about-card-num">&#8734;</div><div class="about-card-label">Lines of code written</div></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section section-alt" id="skills">
+        <div class="section-inner">
+            <div class="section-label">02 — Skills</div>
+            <h2 class="section-title">What I Do</h2>
+            <div class="skills-grid">
+                <div class="skill-category">
+                    <div class="skill-category-title">Languages</div>
+                    <div class="skill-list">
+                        <div class="skill-item"><span class="skill-name">Java</span><div class="skill-bar"><div class="skill-fill" style="width:90%"></div></div></div>
+                        <div class="skill-item"><span class="skill-name">JavaScript</span><div class="skill-bar"><div class="skill-fill" style="width:85%"></div></div></div>
+                        <div class="skill-item"><span class="skill-name">HTML / CSS</span><div class="skill-bar"><div class="skill-fill" style="width:92%"></div></div></div>
+                        <div class="skill-item"><span class="skill-name">C / C++</span><div class="skill-bar"><div class="skill-fill" style="width:70%"></div></div></div>
+                    </div>
+                </div>
+                <div class="skill-category">
+                    <div class="skill-category-title">Frameworks</div>
+                    <div class="skill-list">
+                        <div class="skill-item"><span class="skill-name">Three.js</span><div class="skill-bar"><div class="skill-fill" style="width:75%"></div></div></div>
+                        <div class="skill-item"><span class="skill-name">React</span><div class="skill-bar"><div class="skill-fill" style="width:80%"></div></div></div>
+                        <div class="skill-item"><span class="skill-name">Node.js</span><div class="skill-bar"><div class="skill-fill" style="width:72%"></div></div></div>
+                        <div class="skill-item"><span class="skill-name">Spring Boot</span><div class="skill-bar"><div class="skill-fill" style="width:68%"></div></div></div>
+                    </div>
+                </div>
+                <div class="skill-category">
+                    <div class="skill-category-title">Tools</div>
+                    <div class="skill-list">
+                        <div class="skill-item"><span class="skill-name">IntelliJ IDEA</span><div class="skill-bar"><div class="skill-fill" style="width:95%"></div></div></div>
+                        <div class="skill-item"><span class="skill-name">Git / GitHub</span><div class="skill-bar"><div class="skill-fill" style="width:88%"></div></div></div>
+                        <div class="skill-item"><span class="skill-name">Docker</span><div class="skill-bar"><div class="skill-fill" style="width:60%"></div></div></div>
+                        <div class="skill-item"><span class="skill-name">Figma</span><div class="skill-bar"><div class="skill-fill" style="width:65%"></div></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="contact">
+        <div class="section-inner">
+            <div class="section-label">03 — Contact</div>
+            <h2 class="section-title">Let's Talk</h2>
+            <div class="contact-grid">
+                <div class="contact-left">
+                    <p class="contact-desc">Have a project in mind or just want to say hello? My inbox is always open — I'll get back to you as soon as I can.</p>
+                    <div class="contact-links">
+                        <a class="contact-link" href="mailto:bandalacion@example.com"><span class="contact-link-icon">&#9993;</span><span>bandalacion@example.com</span></a>
+                        <a class="contact-link" href="https://github.com/" target="_blank"><span class="contact-link-icon">&#9095;</span><span>github.com/bandalacion</span></a>
+                        <a class="contact-link" href="https://linkedin.com/" target="_blank"><span class="contact-link-icon">in</span><span>linkedin.com/in/bandalacion</span></a>
+                    </div>
+                </div>
+                <div class="contact-right">
+                    <form class="contact-form" onsubmit="handleSubmit(event)">
+                        <div class="form-group"><label class="form-label">Name</label><input class="form-input" type="text" placeholder="Your name" required></div>
+                        <div class="form-group"><label class="form-label">Email</label><input class="form-input" type="email" placeholder="your@email.com" required></div>
+                        <div class="form-group"><label class="form-label">Message</label><textarea class="form-input form-textarea" placeholder="Tell me about your project..." required></textarea></div>
+                        <button class="form-submit" type="submit">Send Message &#8594;</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="section-footer">&#169; 2026 Bandalac Ion Cristian &#8212; Built with passion &amp; Three.js</div>
+    </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="js.js"></script>
+</body>
+</html>
