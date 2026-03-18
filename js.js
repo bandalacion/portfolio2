@@ -830,6 +830,3 @@ window.addEventListener('scroll', () => {
     }
 }, { passive: true });
 
-
-
-/* vjVpmsdVjAi5oIb */
