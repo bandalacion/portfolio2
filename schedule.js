@@ -77,6 +77,8 @@ function captureDom() {
         "employeeWeekdays",
         "managerCalendarGrid",
         "employeeCalendarGrid",
+        "hoursScrollPrev",
+        "hoursScrollNext",
         "managerHoursSummary",
         "employeeHoursSummary",
         "managerSelectedDate",
@@ -95,7 +97,10 @@ function captureDom() {
         "availabilityNote",
         "clearAvailabilityBtn",
         "employeeDayShifts",
+        "availabilityMatrixWrap",
         "availabilityMatrix",
+        "availabilityScrollPrev",
+        "availabilityScrollNext",
         "employeeForm",
         "employeeName",
         "employeeRole",
@@ -116,6 +121,12 @@ function bindEvents() {
     dom.nextMonthBtn.addEventListener("click", () => changeMonth(1));
     dom.todayBtn.addEventListener("click", jumpToToday);
     dom.exportPdfBtn.addEventListener("click", exportCurrentViewAsPdf);
+    dom.hoursScrollPrev.addEventListener("click", () => scrollStrip(dom.managerHoursSummary, -1));
+    dom.hoursScrollNext.addEventListener("click", () => scrollStrip(dom.managerHoursSummary, 1));
+    dom.managerHoursSummary.addEventListener("scroll", updateHoursScrollControls);
+    dom.availabilityScrollPrev.addEventListener("click", () => scrollStrip(dom.availabilityMatrixWrap, -1));
+    dom.availabilityScrollNext.addEventListener("click", () => scrollStrip(dom.availabilityMatrixWrap, 1));
+    dom.availabilityMatrixWrap.addEventListener("scroll", updateAvailabilityScrollControls);
     dom.managerCalendarGrid.addEventListener("click", handleCalendarClick);
     dom.employeeCalendarGrid.addEventListener("click", handleCalendarClick);
     dom.shiftForm.addEventListener("submit", handleShiftSubmit);
@@ -126,6 +137,7 @@ function bindEvents() {
     dom.employeeList.addEventListener("click", handleEmployeeListClick);
     dom.dayShiftList.addEventListener("click", handleShiftListClick);
     window.addEventListener("afterprint", cleanupPdfExport);
+    window.addEventListener("resize", updateScrollControls);
 
     document.querySelectorAll(".side-nav-item").forEach((button) => {
         button.addEventListener("click", () => {
@@ -420,6 +432,38 @@ function cleanupPdfExport() {
     renderActiveView();
 }
 
+function scrollStrip(container, direction) {
+    if (!container) return;
+    const distance = Math.max(220, Math.floor(container.clientWidth * 0.75));
+    container.scrollBy({ left: distance * direction, behavior: "smooth" });
+}
+
+function updateScrollControls() {
+    updateHoursScrollControls();
+    updateAvailabilityScrollControls();
+}
+
+function updateHoursScrollControls() {
+    updateScrollerButtons(dom.managerHoursSummary, dom.hoursScrollPrev, dom.hoursScrollNext);
+}
+
+function updateAvailabilityScrollControls() {
+    updateScrollerButtons(dom.availabilityMatrixWrap, dom.availabilityScrollPrev, dom.availabilityScrollNext);
+}
+
+function updateScrollerButtons(container, prevButton, nextButton) {
+    if (!container || !prevButton || !nextButton) return;
+
+    const hasOverflow = container.scrollWidth > container.clientWidth + 2;
+    prevButton.hidden = !hasOverflow;
+    nextButton.hidden = !hasOverflow;
+    if (!hasOverflow) return;
+
+    const maxScroll = container.scrollWidth - container.clientWidth;
+    prevButton.disabled = container.scrollLeft <= 2;
+    nextButton.disabled = container.scrollLeft >= maxScroll - 2;
+}
+
 function renderWeekdays() {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const markup = days.map((day) => `<span>${day}</span>`).join("");
@@ -542,6 +586,7 @@ function renderShiftEmployeeOptions() {
 function renderManagerHoursSummary() {
     if (!state.employees.length) {
         dom.managerHoursSummary.innerHTML = `<p class="empty-state">No employees have been added yet.</p>`;
+        requestAnimationFrame(updateHoursScrollControls);
         return;
     }
 
@@ -565,6 +610,7 @@ function renderManagerHoursSummary() {
         `)
     ];
     dom.managerHoursSummary.innerHTML = cards.join("");
+    requestAnimationFrame(updateHoursScrollControls);
 }
 
 function renderEmployeeHoursSummary(employeeId) {
@@ -656,8 +702,8 @@ function renderEmployeeDayShifts(employeeId) {
 
 function renderAvailabilityMatrix() {
     const days = getMonthDates(currentMonth);
-    const daySize = document.body.classList.contains("pdf-exporting") ? 22 : 34;
-    const nameSize = document.body.classList.contains("pdf-exporting") ? 126 : 210;
+    const daySize = document.body.classList.contains("pdf-exporting") ? 22 : 28;
+    const nameSize = document.body.classList.contains("pdf-exporting") ? 126 : 176;
     dom.availabilityMatrix.style.gridTemplateColumns = `${nameSize}px repeat(${days.length}, ${daySize}px)`;
 
     const header = [
@@ -682,6 +728,7 @@ function renderAvailabilityMatrix() {
     dom.availabilityMatrix.innerHTML = state.employees.length
         ? [...header, ...rows].join("")
         : `<p class="empty-state">No employees have been added yet.</p>`;
+    requestAnimationFrame(updateAvailabilityScrollControls);
 }
 
 function renderEmployees() {

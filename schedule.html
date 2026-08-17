@@ -105,7 +105,15 @@
 
             <div class="view-grid" id="managerScheduleView">
                 <div class="calendar-surface">
-                    <div class="hours-summary" id="managerHoursSummary" aria-label="Monthly worked hours summary"></div>
+                    <div class="hours-carousel" aria-label="Monthly worked hours">
+                        <button class="icon-button hours-scroll-btn" id="hoursScrollPrev" type="button" aria-label="Previous employee totals" title="Previous employee totals">
+                            <i data-lucide="chevron-left"></i>
+                        </button>
+                        <div class="hours-summary" id="managerHoursSummary" aria-label="Monthly worked hours summary" tabindex="0"></div>
+                        <button class="icon-button hours-scroll-btn" id="hoursScrollNext" type="button" aria-label="Next employee totals" title="Next employee totals">
+                            <i data-lucide="chevron-right"></i>
+                        </button>
+                    </div>
                     <div class="weekday-row" id="managerWeekdays"></div>
                     <div class="month-grid" id="managerCalendarGrid"></div>
                 </div>
@@ -209,13 +217,23 @@
                             <p class="eyebrow">Team month</p>
                             <h2>Availability overview</h2>
                         </div>
-                        <div class="legend">
-                            <span><b class="dot available"></b>Available</span>
-                            <span><b class="dot maybe"></b>Maybe</span>
-                            <span><b class="dot unavailable"></b>Unavailable</span>
+                        <div class="matrix-actions">
+                            <div class="legend">
+                                <span><b class="dot available"></b>Available</span>
+                                <span><b class="dot maybe"></b>Maybe</span>
+                                <span><b class="dot unavailable"></b>Unavailable</span>
+                            </div>
+                            <div class="matrix-scroll-controls" aria-label="Availability scroll controls">
+                                <button class="icon-button" id="availabilityScrollPrev" type="button" aria-label="Scroll availability left" title="Scroll availability left">
+                                    <i data-lucide="chevron-left"></i>
+                                </button>
+                                <button class="icon-button" id="availabilityScrollNext" type="button" aria-label="Scroll availability right" title="Scroll availability right">
+                                    <i data-lucide="chevron-right"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div class="availability-matrix-wrap">
+                    <div class="availability-matrix-wrap" id="availabilityMatrixWrap">
                         <div class="availability-matrix" id="availabilityMatrix"></div>
                     </div>
                 </div>
