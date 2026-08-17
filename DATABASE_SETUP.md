@@ -1,60 +1,42 @@
-# Shared Scheduler Database Setup
+# Shared Scheduler Storage Setup
 
-The scheduler uses browser storage as a fallback, but cross-device sync needs the deployed `/api/scheduler` endpoint and a Supabase database.
+The scheduler uses browser storage as a fallback, but cross-device sync needs the deployed `/api/scheduler` endpoint and Vercel Blob.
 
-## 1. Create the Supabase table
+## 1. Create Vercel Blob storage
 
-In Supabase, open SQL Editor and run:
+In Vercel:
 
-```sql
--- Use the checked-in file if you prefer copying from the repo:
--- database/supabase.sql
-create table if not exists public.scheduler_state (
-    id text primary key,
-    data jsonb not null,
-    updated_at timestamptz not null default now()
-);
+1. Open your `portfolio2` project.
+2. Go to `Storage`.
+3. Select `Create Database`.
+4. Choose `Blob`.
+5. Connect the Blob store to this project.
 
-create or replace function public.set_scheduler_state_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-    new.updated_at = now();
-    return new;
-end;
-$$;
+For newer Vercel Blob stores, Vercel can authenticate server functions with OIDC automatically. If Vercel also creates a `BLOB_READ_WRITE_TOKEN`, keep it only in Vercel environment variables.
 
-drop trigger if exists scheduler_state_updated_at on public.scheduler_state;
+## 2. Environment variables
 
-create trigger scheduler_state_updated_at
-before update on public.scheduler_state
-for each row
-execute function public.set_scheduler_state_updated_at();
-
-alter table public.scheduler_state enable row level security;
-
-drop policy if exists "scheduler_state_server_only" on public.scheduler_state;
-
-create policy "scheduler_state_server_only"
-on public.scheduler_state
-for all
-using (false)
-with check (false);
-```
-
-## 2. Add Vercel environment variables
-
-In Vercel project settings, add:
+In Vercel project settings, make sure these exist:
 
 ```text
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+BLOB_READ_WRITE_TOKEN=vercel_blob_rw_your_token
 SCHEDULER_STATE_ID=main
 ```
 
-Use the Supabase `service_role` key only in Vercel environment variables. Do not put it in frontend files.
+`SCHEDULER_STATE_ID` is optional. It defaults to `main`.
+
+Do not put the Blob read-write token in frontend files or expose it with `NEXT_PUBLIC_`.
 
 ## 3. Redeploy
 
-Redeploy the site after adding the environment variables. The scheduler should then show `Synced` in the top bar after login.
+Redeploy the site after connecting Blob. The scheduler should show `Synced` in the top bar after login.
+
+## How it stores data
+
+The whole schedule is stored as one private JSON object:
+
+```text
+scheduler/main.json
+```
+
+This is simple and works well for the current prototype. If the app grows into many locations, managers, or audit logs, a relational database would become the better fit.

@@ -1,6 +1,7 @@
 "use strict";
 
 const STATE_ID = process.env.SCHEDULER_STATE_ID || "main";
+const STATE_PATH = `scheduler/${STATE_ID}.json`;
 
 const defaultState = {
     managerCode: "MANAGER2026",
@@ -22,21 +23,14 @@ module.exports = async function handler(request, response) {
         return;
     }
 
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        response.status(503).json({
-            error: "Database is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
-        });
-        return;
-    }
-
     try {
+        const { get, put } = await import("@vercel/blob");
+
         if (request.method === "GET") {
-            const rows = await supabaseFetch(`scheduler_state?id=eq.${encodeURIComponent(STATE_ID)}&select=data,updated_at`, {
-                method: "GET"
-            });
+            const saved = await readSchedulerState(get);
             response.status(200).json({
-                data: rows[0] ? rows[0].data : defaultState,
-                updatedAt: rows[0] ? rows[0].updated_at : null
+                data: saved ? saved.data : defaultState,
+                updatedAt: saved ? saved.updatedAt : null
             });
             return;
         }
@@ -48,14 +42,18 @@ module.exports = async function handler(request, response) {
                 return;
             }
 
-            const rows = await supabaseFetch("scheduler_state?on_conflict=id", {
-                method: "POST",
-                headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-                body: JSON.stringify([{ id: STATE_ID, data: body.data }])
+            const saved = {
+                data: normalizeState(body.data),
+                updatedAt: new Date().toISOString()
+            };
+            await put(STATE_PATH, JSON.stringify(saved), {
+                access: "private",
+                allowOverwrite: true,
+                contentType: "application/json"
             });
             response.status(200).json({
-                data: rows[0] ? rows[0].data : body.data,
-                updatedAt: rows[0] ? rows[0].updated_at : null
+                data: saved.data,
+                updatedAt: saved.updatedAt
             });
             return;
         }
@@ -63,29 +61,49 @@ module.exports = async function handler(request, response) {
         response.setHeader("Allow", "GET, POST, PUT, OPTIONS");
         response.status(405).json({ error: "Method not allowed" });
     } catch (error) {
-        response.status(500).json({ error: error.message || "Database request failed" });
+        const message = error.message || "Blob storage request failed";
+        const status = /No blob credentials/i.test(message) ? 503 : 500;
+        response.status(status).json({ error: message });
     }
 };
 
-async function supabaseFetch(path, options) {
-    const baseUrl = process.env.SUPABASE_URL.replace(/\/$/, "");
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const result = await fetch(`${baseUrl}/rest/v1/${path}`, {
-        ...options,
-        headers: {
-            apikey: serviceKey,
-            Authorization: `Bearer ${serviceKey}`,
-            "Content-Type": "application/json",
-            ...(options.headers || {})
+async function readSchedulerState(get) {
+    try {
+        const result = await get(STATE_PATH, { access: "private", useCache: false });
+        if (!result || result.statusCode === 404) return null;
+        if (result.statusCode && result.statusCode >= 400) {
+            throw new Error(`Blob read failed (${result.statusCode})`);
         }
-    });
 
-    const text = await result.text();
-    const json = text ? JSON.parse(text) : null;
-    if (!result.ok) {
-        throw new Error(json && json.message ? json.message : `Supabase request failed (${result.status})`);
+        const text = await streamToText(result.stream);
+        const parsed = text ? JSON.parse(text) : null;
+        if (parsed && parsed.data) {
+            return {
+                data: normalizeState(parsed.data),
+                updatedAt: parsed.updatedAt || null
+            };
+        }
+        return null;
+    } catch (error) {
+        if (error && /not found/i.test(error.message || "")) return null;
+        throw error;
     }
-    return json || [];
+}
+
+function normalizeState(nextState) {
+    return {
+        ...defaultState,
+        ...(nextState || {}),
+        employees: Array.isArray(nextState && nextState.employees) ? nextState.employees : defaultState.employees,
+        availability: nextState && nextState.availability ? nextState.availability : {},
+        shifts: nextState && nextState.shifts ? nextState.shifts : {}
+    };
+}
+
+async function streamToText(stream) {
+    if (!stream) return "";
+    const response = new Response(stream);
+    return response.text();
 }
 
 function readJsonBody(request) {

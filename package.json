@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": {
+    "check": "node --check schedule.js && node --check api/scheduler.js"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.8.0"
+  }
+}
