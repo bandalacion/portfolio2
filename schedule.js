@@ -67,6 +67,8 @@ function captureDom() {
         "employeeWeekdays",
         "managerCalendarGrid",
         "employeeCalendarGrid",
+        "managerHoursSummary",
+        "employeeHoursSummary",
         "managerSelectedDate",
         "employeeSelectedDate",
         "managerDayAvailability",
@@ -306,6 +308,7 @@ function renderMonthLabel() {
 }
 
 function renderManagerSchedule() {
+    renderManagerHoursSummary();
     renderCalendar(dom.managerCalendarGrid, "manager");
     dom.managerSelectedDate.textContent = longDate(selectedDate);
     renderShiftEmployeeOptions();
@@ -321,6 +324,7 @@ function renderEmployeeAvailability() {
     }
     renderCalendar(dom.employeeCalendarGrid, "employee");
     dom.employeeSelectedDate.textContent = longDate(selectedDate);
+    renderEmployeeHoursSummary(employee.id);
     const saved = getAvailability(employee.id, selectedDate);
     pendingAvailabilityStatus = saved ? saved.status : pendingAvailabilityStatus;
     renderAvailabilityForm();
@@ -409,6 +413,45 @@ function renderShiftEmployeeOptions() {
         `<option value="${employee.id}">${escapeHtml(employee.name)}</option>`
     )).join("");
     dom.shiftForm.querySelector(".primary-button").disabled = false;
+}
+
+function renderManagerHoursSummary() {
+    if (!state.employees.length) {
+        dom.managerHoursSummary.innerHTML = `<p class="empty-state">No employees have been added yet.</p>`;
+        return;
+    }
+
+    const totals = getMonthlyHoursByEmployee(currentMonth);
+    const teamMinutes = totals.reduce((sum, item) => sum + item.minutes, 0);
+    const teamShifts = totals.reduce((sum, item) => sum + item.shifts, 0);
+    const cards = [
+        `
+            <div class="hours-card total">
+                <span class="hours-name">Team total</span>
+                <span class="hours-value">${formatHours(teamMinutes)}</span>
+                <span class="hours-detail">${teamShifts} scheduled ${teamShifts === 1 ? "shift" : "shifts"}</span>
+            </div>
+        `,
+        ...totals.map(({ employee, minutes, shifts }) => `
+            <div class="hours-card">
+                <span class="hours-name">${escapeHtml(employee.name)}</span>
+                <span class="hours-value">${formatHours(minutes)}</span>
+                <span class="hours-detail">${shifts} ${shifts === 1 ? "shift" : "shifts"} in ${escapeHtml(monthTitle(currentMonth))}</span>
+            </div>
+        `)
+    ];
+    dom.managerHoursSummary.innerHTML = cards.join("");
+}
+
+function renderEmployeeHoursSummary(employeeId) {
+    const employee = getEmployee(employeeId);
+    const minutes = getEmployeeMonthlyMinutes(employeeId, currentMonth);
+    const shifts = getEmployeeMonthlyShiftCount(employeeId, currentMonth);
+    dom.employeeHoursSummary.innerHTML = `
+        <span class="hours-name">${escapeHtml(monthTitle(currentMonth))}</span>
+        <span class="hours-value">${formatHours(minutes)}</span>
+        <span class="hours-detail">${escapeHtml(employee.name)} has ${shifts} scheduled ${shifts === 1 ? "shift" : "shifts"}</span>
+    `;
 }
 
 function renderManagerDayAvailability() {
@@ -517,21 +560,26 @@ function renderAvailabilityMatrix() {
 
 function renderEmployees() {
     dom.employeeList.innerHTML = state.employees.length
-        ? state.employees.map((employee) => `
-            <div class="employee-row">
-                <div class="employee-meta">
-                    <span class="employee-color" style="background:${employee.color}"></span>
-                    <div>
-                        <p class="employee-name">${escapeHtml(employee.name)}</p>
-                        <p class="employee-sub">${escapeHtml(employee.role || "Employee")}</p>
+        ? state.employees.map((employee) => {
+            const minutes = getEmployeeMonthlyMinutes(employee.id, currentMonth);
+            const shifts = getEmployeeMonthlyShiftCount(employee.id, currentMonth);
+            return `
+                <div class="employee-row">
+                    <div class="employee-meta">
+                        <span class="employee-color" style="background:${employee.color}"></span>
+                        <div>
+                            <p class="employee-name">${escapeHtml(employee.name)}</p>
+                            <p class="employee-sub">${escapeHtml(employee.role || "Employee")}</p>
+                            <p class="employee-hours">${formatHours(minutes)} this month, ${shifts} ${shifts === 1 ? "shift" : "shifts"}</p>
+                        </div>
                     </div>
+                    <span class="code-chip">${escapeHtml(employee.code)}</span>
+                    <button class="danger-button" type="button" data-action="remove-employee" data-id="${employee.id}" aria-label="Remove ${escapeHtml(employee.name)}" title="Remove employee">
+                        <i data-lucide="user-minus"></i>
+                    </button>
                 </div>
-                <span class="code-chip">${escapeHtml(employee.code)}</span>
-                <button class="danger-button" type="button" data-action="remove-employee" data-id="${employee.id}" aria-label="Remove ${escapeHtml(employee.name)}" title="Remove employee">
-                    <i data-lucide="user-minus"></i>
-                </button>
-            </div>
-        `).join("")
+            `;
+        }).join("")
         : `<p class="empty-state">No employees have been added yet.</p>`;
     refreshIcons();
 }
@@ -688,6 +736,56 @@ function getAvailabilitySummary(dateKey) {
         if (availability) summary[availability.status] += 1;
         return summary;
     }, { available: 0, maybe: 0, unavailable: 0 });
+}
+
+function getMonthlyHoursByEmployee(monthDate) {
+    return state.employees.map((employee) => ({
+        employee,
+        minutes: getEmployeeMonthlyMinutes(employee.id, monthDate),
+        shifts: getEmployeeMonthlyShiftCount(employee.id, monthDate)
+    }));
+}
+
+function getEmployeeMonthlyMinutes(employeeId, monthDate) {
+    return Object.entries(state.shifts).reduce((total, [dateKey, shifts]) => {
+        if (!isSameMonth(parseDate(dateKey), monthDate)) return total;
+        return total + shifts
+            .filter((shift) => shift.employeeId === employeeId)
+            .reduce((sum, shift) => sum + getShiftMinutes(shift), 0);
+    }, 0);
+}
+
+function getEmployeeMonthlyShiftCount(employeeId, monthDate) {
+    return Object.entries(state.shifts).reduce((count, [dateKey, shifts]) => {
+        if (!isSameMonth(parseDate(dateKey), monthDate)) return count;
+        return count + shifts.filter((shift) => shift.employeeId === employeeId).length;
+    }, 0);
+}
+
+function getShiftMinutes(shift) {
+    const start = timeToMinutes(shift.start);
+    const end = timeToMinutes(shift.end);
+    if (start === null || end === null || start === end) return 0;
+    return end > start ? end - start : end + 24 * 60 - start;
+}
+
+function timeToMinutes(value) {
+    const match = /^(\d{2}):(\d{2})$/.exec(value || "");
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59) return null;
+    return hours * 60 + minutes;
+}
+
+function isSameMonth(date, monthDate) {
+    return date.getFullYear() === monthDate.getFullYear() && date.getMonth() === monthDate.getMonth();
+}
+
+function formatHours(minutes) {
+    const hours = minutes / 60;
+    if (Number.isInteger(hours)) return `${hours}h`;
+    return `${hours.toFixed(1).replace(/\.0$/, "")}h`;
 }
 
 function getCalendarCells(monthDate) {

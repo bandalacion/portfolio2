@@ -419,6 +419,69 @@ select:focus {
     padding: 1rem;
 }
 
+.hours-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.65rem;
+    margin-bottom: 1rem;
+}
+
+.hours-card {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 0;
+    padding: 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.68);
+}
+
+.hours-card.total {
+    background: #1d1d1f;
+    color: white;
+}
+
+.employee-total-card {
+    margin-bottom: 1rem;
+    background: rgba(0, 122, 255, 0.1);
+    border-color: rgba(0, 122, 255, 0.22);
+}
+
+.hours-name,
+.hours-value,
+.hours-detail {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hours-name {
+    color: var(--muted);
+    font-size: 0.74rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.hours-card.total .hours-name {
+    color: rgba(255, 255, 255, 0.62);
+}
+
+.hours-value {
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.hours-detail {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.hours-card.total .hours-detail {
+    color: rgba(255, 255, 255, 0.58);
+}
+
 .weekday-row,
 .month-grid {
     display: grid;
@@ -798,6 +861,13 @@ select:focus {
     margin: 0;
     color: var(--muted);
     font-size: 0.84rem;
+}
+
+.employee-hours {
+    margin-top: 0.25rem;
+    color: var(--text);
+    font-size: 0.82rem;
+    font-weight: 800;
 }
 
 .code-chip {
