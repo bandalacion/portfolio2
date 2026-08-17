@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Schedule | Bandalac Ion Cristian</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="schedule.css">
+</head>
+<body>
+<div class="app-shell">
+    <header class="topbar">
+        <a class="brand-link" href="index.html" aria-label="Back to portfolio">
+            <span class="brand-icon"><i data-lucide="calendar-days"></i></span>
+            <span>Team Schedule</span>
+        </a>
+        <div class="topbar-actions">
+            <span class="session-pill" id="sessionPill" hidden></span>
+            <button class="ghost-button" id="logoutBtn" type="button" hidden>
+                <i data-lucide="log-out"></i>
+                <span>Log out</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="login-view" id="loginView">
+        <section class="login-panel" aria-labelledby="loginTitle">
+            <div class="login-mark"><i data-lucide="lock-keyhole"></i></div>
+            <p class="eyebrow">Staff calendar</p>
+            <h1 id="loginTitle">Sign in with your access code</h1>
+            <form class="login-form" id="loginForm">
+                <label class="field-label" for="accessCode">Access code</label>
+                <div class="code-field">
+                    <input id="accessCode" name="accessCode" type="password" autocomplete="one-time-code" placeholder="Enter code" required>
+                    <button class="icon-button" id="toggleCodeBtn" type="button" aria-label="Show access code" title="Show access code">
+                        <i data-lucide="eye"></i>
+                    </button>
+                </div>
+                <button class="primary-button" type="submit">
+                    <i data-lucide="log-in"></i>
+                    <span>Sign in</span>
+                </button>
+                <p class="form-message" id="loginMessage" role="alert"></p>
+            </form>
+        </section>
+    </main>
+
+    <main class="workspace" id="appView" hidden>
+        <aside class="sidebar" aria-label="Schedule navigation">
+            <div class="profile-block">
+                <div class="profile-avatar" id="profileAvatar">M</div>
+                <div>
+                    <p class="profile-name" id="profileName">Manager</p>
+                    <p class="profile-role" id="profileRole">Calendar access</p>
+                </div>
+            </div>
+            <nav class="side-nav">
+                <button class="side-nav-item active manager-only" type="button" data-view="schedule">
+                    <i data-lucide="calendar-plus"></i>
+                    <span>Schedule</span>
+                </button>
+                <button class="side-nav-item manager-only" type="button" data-view="managerAvailability">
+                    <i data-lucide="users-round"></i>
+                    <span>Availability</span>
+                </button>
+                <button class="side-nav-item manager-only" type="button" data-view="employees">
+                    <i data-lucide="user-cog"></i>
+                    <span>Employees</span>
+                </button>
+                <button class="side-nav-item employee-only" type="button" data-view="employeeAvailability">
+                    <i data-lucide="calendar-check"></i>
+                    <span>My Month</span>
+                </button>
+            </nav>
+        </aside>
+
+        <section class="planner">
+            <div class="planner-head">
+                <div>
+                    <p class="eyebrow" id="surfaceEyebrow">Manager</p>
+                    <h1 id="surfaceTitle">Schedule</h1>
+                </div>
+                <div class="calendar-controls" aria-label="Calendar controls">
+                    <button class="icon-button" id="prevMonthBtn" type="button" aria-label="Previous month" title="Previous month">
+                        <i data-lucide="chevron-left"></i>
+                    </button>
+                    <button class="secondary-button" id="todayBtn" type="button">
+                        <i data-lucide="calendar"></i>
+                        <span>Today</span>
+                    </button>
+                    <button class="icon-button" id="nextMonthBtn" type="button" aria-label="Next month" title="Next month">
+                        <i data-lucide="chevron-right"></i>
+                    </button>
+                    <span class="month-label" id="monthLabel"></span>
+                </div>
+            </div>
+
+            <div class="view-grid" id="managerScheduleView">
+                <div class="calendar-surface">
+                    <div class="weekday-row" id="managerWeekdays"></div>
+                    <div class="month-grid" id="managerCalendarGrid"></div>
+                </div>
+                <aside class="day-panel">
+                    <div class="panel-heading">
+                        <p class="eyebrow">Selected day</p>
+                        <h2 id="managerSelectedDate"></h2>
+                    </div>
+                    <div class="availability-list" id="managerDayAvailability"></div>
+                    <form class="shift-form" id="shiftForm">
+                        <div class="form-grid">
+                            <label class="field-group">
+                                <span>Employee</span>
+                                <select id="shiftEmployee" required></select>
+                            </label>
+                            <label class="field-group">
+                                <span>Role</span>
+                                <input id="shiftRole" type="text" placeholder="Shift role">
+                            </label>
+                            <label class="field-group">
+                                <span>Start</span>
+                                <input id="shiftStart" type="time" value="09:00" required>
+                            </label>
+                            <label class="field-group">
+                                <span>End</span>
+                                <input id="shiftEnd" type="time" value="17:00" required>
+                            </label>
+                        </div>
+                        <label class="field-group">
+                            <span>Note</span>
+                            <input id="shiftNote" type="text" placeholder="Optional note">
+                        </label>
+                        <button class="primary-button" type="submit">
+                            <i data-lucide="plus"></i>
+                            <span>Add shift</span>
+                        </button>
+                    </form>
+                    <div class="shift-list" id="dayShiftList"></div>
+                </aside>
+            </div>
+
+            <div class="view-grid" id="employeeAvailabilityView" hidden>
+                <div class="calendar-surface">
+                    <div class="weekday-row" id="employeeWeekdays"></div>
+                    <div class="month-grid" id="employeeCalendarGrid"></div>
+                </div>
+                <aside class="day-panel">
+                    <div class="panel-heading">
+                        <p class="eyebrow">Availability</p>
+                        <h2 id="employeeSelectedDate"></h2>
+                    </div>
+                    <form class="availability-form" id="availabilityForm">
+                        <div class="segmented-control" role="group" aria-label="Availability status">
+                            <button class="segment active" type="button" data-status="available">
+                                <i data-lucide="check"></i>
+                                <span>Available</span>
+                            </button>
+                            <button class="segment" type="button" data-status="maybe">
+                                <i data-lucide="circle-help"></i>
+                                <span>Maybe</span>
+                            </button>
+                            <button class="segment" type="button" data-status="unavailable">
+                                <i data-lucide="x"></i>
+                                <span>Unavailable</span>
+                            </button>
+                        </div>
+                        <div class="form-grid">
+                            <label class="field-group">
+                                <span>From</span>
+                                <input id="availableStart" type="time" value="09:00">
+                            </label>
+                            <label class="field-group">
+                                <span>Until</span>
+                                <input id="availableEnd" type="time" value="17:00">
+                            </label>
+                        </div>
+                        <label class="field-group">
+                            <span>Note</span>
+                            <input id="availabilityNote" type="text" placeholder="Optional note">
+                        </label>
+                        <div class="button-row">
+                            <button class="primary-button" type="submit">
+                                <i data-lucide="save"></i>
+                                <span>Save</span>
+                            </button>
+                            <button class="secondary-button" id="clearAvailabilityBtn" type="button">
+                                <i data-lucide="eraser"></i>
+                                <span>Clear</span>
+                            </button>
+                        </div>
+                    </form>
+                    <div class="shift-list" id="employeeDayShifts"></div>
+                </aside>
+            </div>
+
+            <div class="stack-view" id="managerAvailabilityView" hidden>
+                <div class="calendar-surface">
+                    <div class="matrix-head">
+                        <div>
+                            <p class="eyebrow">Team month</p>
+                            <h2>Availability overview</h2>
+                        </div>
+                        <div class="legend">
+                            <span><b class="dot available"></b>Available</span>
+                            <span><b class="dot maybe"></b>Maybe</span>
+                            <span><b class="dot unavailable"></b>Unavailable</span>
+                        </div>
+                    </div>
+                    <div class="availability-matrix-wrap">
+                        <div class="availability-matrix" id="availabilityMatrix"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="employees-layout" id="employeesView" hidden>
+                <form class="employee-form" id="employeeForm">
+                    <div>
+                        <p class="eyebrow">Team</p>
+                        <h2>Add employee</h2>
+                    </div>
+                    <label class="field-group">
+                        <span>Name</span>
+                        <input id="employeeName" type="text" placeholder="Employee name" required>
+                    </label>
+                    <label class="field-group">
+                        <span>Role</span>
+                        <input id="employeeRole" type="text" placeholder="Role">
+                    </label>
+                    <label class="field-group">
+                        <span>Access code</span>
+                        <div class="inline-field">
+                            <input id="employeeCode" type="text" placeholder="Auto generated">
+                            <button class="icon-button" id="generateCodeBtn" type="button" aria-label="Generate code" title="Generate code">
+                                <i data-lucide="refresh-cw"></i>
+                            </button>
+                        </div>
+                    </label>
+                    <button class="primary-button" type="submit">
+                        <i data-lucide="user-plus"></i>
+                        <span>Add employee</span>
+                    </button>
+                    <p class="form-message" id="employeeFormMessage" role="alert"></p>
+                </form>
+                <div class="employee-list" id="employeeList"></div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="schedule.js"></script>
+</body>
+</html>

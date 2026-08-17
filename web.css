@@ -618,3 +618,31 @@ body { overflow-y: auto !important; background: #05060f; }
     top: unset !important;
     right: unset !important;
 }
+
+@media (max-width: 760px) {
+    #navbar {
+        left: 1rem;
+        right: 1rem;
+        top: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .nav-links {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .color-btn,
+    .nav-home {
+        height: 42px;
+        min-width: 0;
+        padding: 0.6rem 0.85rem;
+        font-size: 0.68rem;
+    }
+
+    .nav-home.visible {
+        padding: 0 0.85rem;
+    }
+}
