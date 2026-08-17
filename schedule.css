@@ -104,7 +104,8 @@ a {
     gap: 0.75rem;
 }
 
-.session-pill {
+.session-pill,
+.sync-pill {
     max-width: 240px;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -116,6 +117,22 @@ a {
     color: var(--muted);
     font-size: 0.875rem;
     font-weight: 600;
+}
+
+.sync-pill {
+    color: var(--blue);
+}
+
+.sync-pill.local {
+    color: var(--muted);
+}
+
+.sync-pill.error {
+    color: var(--red);
+}
+
+.sync-pill.saving {
+    color: var(--orange);
 }
 
 .login-view {
@@ -962,6 +979,7 @@ svg {
 
     .brand-link span:last-child,
     .session-pill,
+    .sync-pill,
     .side-nav-item span,
     .secondary-button span,
     .ghost-button span {

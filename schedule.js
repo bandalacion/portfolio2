@@ -2,6 +2,7 @@
 
 const STORAGE_KEY = "portfolio2-scheduler-v1";
 const SESSION_KEY = "portfolio2-scheduler-session";
+const SYNC_ENDPOINT = "/api/scheduler";
 
 const employeeColors = [
     "#007aff",
@@ -25,13 +26,17 @@ const stateTemplate = () => ({
     shifts: {}
 });
 
-let state = loadState();
+let state = normalizeState(loadState());
 let currentUser = loadSession();
 let activeView = currentUser && currentUser.type === "employee" ? "employeeAvailability" : "schedule";
 let currentMonth = startOfMonth(new Date());
 let selectedDate = formatDate(new Date());
 let pendingAvailabilityStatus = "available";
 let previousDocumentTitle = document.title;
+let remoteSyncAvailable = false;
+let remoteSaveTimer = null;
+let isApplyingRemoteState = false;
+let syncStatus = { label: "Local only", type: "local" };
 
 const dom = {};
 
@@ -39,6 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
     captureDom();
     bindEvents();
     render();
+    hydrateRemoteState();
 });
 
 function captureDom() {
@@ -50,6 +56,7 @@ function captureDom() {
         "accessCode",
         "toggleCodeBtn",
         "logoutBtn",
+        "syncPill",
         "sessionPill",
         "profileAvatar",
         "profileName",
@@ -149,8 +156,20 @@ function loadState() {
     }
 }
 
-function saveState() {
+function normalizeState(nextState) {
+    return {
+        ...stateTemplate(),
+        ...(nextState || {}),
+        employees: Array.isArray(nextState && nextState.employees) ? nextState.employees : stateTemplate().employees,
+        availability: nextState && nextState.availability ? nextState.availability : {},
+        shifts: nextState && nextState.shifts ? nextState.shifts : {}
+    };
+}
+
+function saveState(options = {}) {
+    const shouldSync = options.sync !== false;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (shouldSync && !isApplyingRemoteState) queueRemoteSave();
 }
 
 function loadSession() {
@@ -215,6 +234,7 @@ function render() {
         dom.loginView.hidden = false;
         dom.appView.hidden = true;
         dom.logoutBtn.hidden = true;
+        dom.syncPill.hidden = true;
         dom.sessionPill.hidden = true;
         refreshIcons();
         return;
@@ -223,14 +243,87 @@ function render() {
     dom.loginView.hidden = true;
     dom.appView.hidden = false;
     dom.logoutBtn.hidden = false;
+    dom.syncPill.hidden = false;
     dom.sessionPill.hidden = false;
 
     updateSessionUi();
+    renderSyncStatus();
     renderWeekdays();
     renderMonthLabel();
     renderNavigation();
     renderActiveView();
     refreshIcons();
+}
+
+async function hydrateRemoteState() {
+    setSyncStatus("Checking sync", "saving");
+    try {
+        const response = await fetch(SYNC_ENDPOINT, {
+            headers: { Accept: "application/json" },
+            cache: "no-store"
+        });
+        if (!response.ok) throw new Error(`Sync unavailable (${response.status})`);
+
+        const payload = await response.json();
+        remoteSyncAvailable = true;
+        if (payload && payload.updatedAt === null) {
+            setSyncStatus("Ready to sync", "synced");
+            queueRemoteSave();
+        } else if (payload && payload.data) {
+            isApplyingRemoteState = true;
+            state = normalizeState(payload.data);
+            saveState({ sync: false });
+            currentUser = loadSession();
+            isApplyingRemoteState = false;
+            setSyncStatus("Synced", "synced");
+            render();
+        }
+    } catch (error) {
+        remoteSyncAvailable = false;
+        setSyncStatus("Local only", "local");
+    }
+}
+
+function queueRemoteSave() {
+    if (!remoteSyncAvailable) {
+        renderSyncStatus();
+        return;
+    }
+
+    clearTimeout(remoteSaveTimer);
+    setSyncStatus("Saving", "saving");
+    remoteSaveTimer = setTimeout(syncStateToServer, 450);
+}
+
+async function syncStateToServer() {
+    if (!remoteSyncAvailable) return;
+
+    try {
+        const response = await fetch(SYNC_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json"
+            },
+            body: JSON.stringify({ data: state })
+        });
+        if (!response.ok) throw new Error(`Save failed (${response.status})`);
+        setSyncStatus("Synced", "synced");
+    } catch (error) {
+        remoteSyncAvailable = false;
+        setSyncStatus("Local only", "error");
+    }
+}
+
+function setSyncStatus(label, type) {
+    syncStatus = { label, type };
+    renderSyncStatus();
+}
+
+function renderSyncStatus() {
+    if (!dom.syncPill) return;
+    dom.syncPill.textContent = syncStatus.label;
+    dom.syncPill.className = `sync-pill ${syncStatus.type === "synced" ? "" : syncStatus.type}`;
 }
 
 function updateSessionUi() {
