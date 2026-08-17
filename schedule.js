@@ -31,6 +31,7 @@ let activeView = currentUser && currentUser.type === "employee" ? "employeeAvail
 let currentMonth = startOfMonth(new Date());
 let selectedDate = formatDate(new Date());
 let pendingAvailabilityStatus = "available";
+let previousDocumentTitle = document.title;
 
 const dom = {};
 
@@ -58,7 +59,9 @@ function captureDom() {
         "prevMonthBtn",
         "nextMonthBtn",
         "todayBtn",
+        "exportPdfBtn",
         "monthLabel",
+        "printHeading",
         "managerScheduleView",
         "employeeAvailabilityView",
         "managerAvailabilityView",
@@ -105,6 +108,7 @@ function bindEvents() {
     dom.prevMonthBtn.addEventListener("click", () => changeMonth(-1));
     dom.nextMonthBtn.addEventListener("click", () => changeMonth(1));
     dom.todayBtn.addEventListener("click", jumpToToday);
+    dom.exportPdfBtn.addEventListener("click", exportCurrentViewAsPdf);
     dom.managerCalendarGrid.addEventListener("click", handleCalendarClick);
     dom.employeeCalendarGrid.addEventListener("click", handleCalendarClick);
     dom.shiftForm.addEventListener("submit", handleShiftSubmit);
@@ -114,6 +118,7 @@ function bindEvents() {
     dom.generateCodeBtn.addEventListener("click", fillGeneratedEmployeeCode);
     dom.employeeList.addEventListener("click", handleEmployeeListClick);
     dom.dayShiftList.addEventListener("click", handleShiftListClick);
+    window.addEventListener("afterprint", cleanupPdfExport);
 
     document.querySelectorAll(".side-nav-item").forEach((button) => {
         button.addEventListener("click", () => {
@@ -280,6 +285,7 @@ function renderActiveView() {
     const [eyebrow, title] = titles[activeView] || titles.schedule;
     dom.surfaceEyebrow.textContent = eyebrow;
     dom.surfaceTitle.textContent = title;
+    renderPrintHeading();
 
     if (activeView === "schedule") renderManagerSchedule();
     if (activeView === "employeeAvailability") renderEmployeeAvailability();
@@ -294,6 +300,31 @@ function setActiveView(view) {
         activeView = view;
     }
     render();
+}
+
+function renderPrintHeading() {
+    const titleMap = {
+        schedule: "Team Schedule",
+        employeeAvailability: "My Schedule",
+        managerAvailability: "Team Availability",
+        employees: "Employees"
+    };
+    dom.printHeading.textContent = `${titleMap[activeView] || "Calendar"} - ${monthTitle(currentMonth)}`;
+}
+
+function exportCurrentViewAsPdf() {
+    previousDocumentTitle = document.title;
+    document.body.classList.add("pdf-exporting");
+    document.title = `${(dom.printHeading.textContent || "Team Schedule").replace(/\s+/g, "-")}`;
+    renderActiveView();
+    setTimeout(() => window.print(), 80);
+}
+
+function cleanupPdfExport() {
+    if (!document.body.classList.contains("pdf-exporting")) return;
+    document.body.classList.remove("pdf-exporting");
+    document.title = previousDocumentTitle;
+    renderActiveView();
 }
 
 function renderWeekdays() {
@@ -532,7 +563,9 @@ function renderEmployeeDayShifts(employeeId) {
 
 function renderAvailabilityMatrix() {
     const days = getMonthDates(currentMonth);
-    dom.availabilityMatrix.style.gridTemplateColumns = `minmax(150px, 1.3fr) repeat(${days.length}, minmax(34px, 1fr))`;
+    const daySize = document.body.classList.contains("pdf-exporting") ? 22 : 34;
+    const nameSize = document.body.classList.contains("pdf-exporting") ? 126 : 210;
+    dom.availabilityMatrix.style.gridTemplateColumns = `${nameSize}px repeat(${days.length}, ${daySize}px)`;
 
     const header = [
         `<div class="matrix-day"></div>`,
