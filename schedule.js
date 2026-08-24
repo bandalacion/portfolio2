@@ -225,8 +225,8 @@ function bindEvents() {
     dom.loginForm.addEventListener("submit", handleLogin);
     dom.toggleCodeBtn.addEventListener("click", toggleAccessCode);
     dom.logoutBtn.addEventListener("click", logout);
-    dom.prevMonthBtn.addEventListener("click", () => changeMonth(-1));
-    dom.nextMonthBtn.addEventListener("click", () => changeMonth(1));
+    dom.prevMonthBtn.addEventListener("click", () => changePeriod(-1));
+    dom.nextMonthBtn.addEventListener("click", () => changePeriod(1));
     dom.todayBtn.addEventListener("click", jumpToToday);
     dom.exportPdfBtn.addEventListener("click", exportCurrentViewAsPdf);
     dom.exportPayrollBtn.addEventListener("click", exportPayrollCsv);
@@ -1333,7 +1333,15 @@ function renderWeekdays() {
 }
 
 function renderMonthLabel() {
-    dom.monthLabel.textContent = monthTitle(currentMonth);
+    const scheduleWeekMode = isManagerScheduleView();
+    const label = scheduleWeekMode
+        ? weekTitle(getScheduleGridDates())
+        : monthTitle(currentMonth);
+    dom.monthLabel.textContent = label;
+    dom.prevMonthBtn.setAttribute("aria-label", scheduleWeekMode ? "Previous week" : "Previous month");
+    dom.prevMonthBtn.setAttribute("title", scheduleWeekMode ? "Previous week" : "Previous month");
+    dom.nextMonthBtn.setAttribute("aria-label", scheduleWeekMode ? "Next week" : "Next month");
+    dom.nextMonthBtn.setAttribute("title", scheduleWeekMode ? "Next week" : "Next month");
 }
 
 function renderManagerSchedule() {
@@ -1438,11 +1446,11 @@ function renderCoveragePanel() {
 function renderScheduleMatrix() {
     if (!dom.scheduleMatrix) return;
 
-    const days = getMonthDates(currentMonth);
+    const days = getScheduleGridDates();
     const manager = getCurrentManagerConfig();
     const employees = getManagerEmployees();
-    const nameColumn = document.body.classList.contains("pdf-exporting") ? "126px" : "minmax(112px, 1.2fr)";
-    const dayColumn = document.body.classList.contains("pdf-exporting") ? "42px" : "minmax(22px, 1fr)";
+    const nameColumn = document.body.classList.contains("pdf-exporting") ? "126px" : "minmax(150px, 0.8fr)";
+    const dayColumn = document.body.classList.contains("pdf-exporting") ? "42px" : "minmax(92px, 1fr)";
     dom.scheduleMatrix.style.gridTemplateColumns = `${nameColumn} repeat(${days.length}, ${dayColumn})`;
 
     if (!employees.length) {
@@ -1492,8 +1500,8 @@ function renderScheduleMatrixCell(employee, dateKey) {
         : availability
             ? `${employee.name}: ${formatAvailabilityDetail(availability)}`
             : `${employee.name}: no availability entered`;
-    const timeHint = availability && availability.start && availability.end ? formatCompactTimeRange(availability.start, availability.end) : "";
-    const label = scheduled ? formatCompactTimeRange(shift.start, shift.end) : (statusShort(status) || "-");
+    const timeHint = availability && availability.start && availability.end ? `${availability.start}-${availability.end}` : "";
+    const label = scheduled ? `${shift.start}-${shift.end}` : (statusShort(status) || "-");
 
     return `
         <button class="schedule-check-cell ${status} ${conflict ? "conflict" : ""} ${disabled ? "disabled" : ""}" type="button" data-action="edit-schedule-cell" data-employee-id="${escapeHtml(employee.id)}" data-date="${escapeHtml(dateKey)}" title="${escapeHtml(title)}" aria-pressed="${scheduled ? "true" : "false"}" aria-label="${escapeHtml(title)}" ${disabled ? "disabled" : ""}>
@@ -2989,6 +2997,25 @@ function getScheduleWarnings(dateKey) {
     return warnings;
 }
 
+function changePeriod(delta) {
+    if (isManagerScheduleView()) {
+        changeWeek(delta);
+        return;
+    }
+    changeMonth(delta);
+}
+
+function changeWeek(delta) {
+    closeShiftPopover();
+    const date = parseDate(selectedDate);
+    date.setDate(date.getDate() + (delta * 7));
+    currentMonth = startOfMonth(date);
+    selectedDate = formatDate(date);
+    availabilityBuilderSelectedIds.clear();
+    renderMonthLabel();
+    renderActiveView();
+}
+
 function changeMonth(delta) {
     closeShiftPopover();
     currentMonth = addMonths(currentMonth, delta);
@@ -3019,6 +3046,14 @@ function setSelectedDate(date) {
     availabilityBuilderSelectedIds.clear();
     renderMonthLabel();
     renderActiveView();
+}
+
+function isManagerScheduleView() {
+    return Boolean(currentUser && currentUser.type === "manager" && activeView === "schedule");
+}
+
+function getScheduleGridDates() {
+    return getWeekDates(parseDate(selectedDate));
 }
 
 function getCurrentEmployee() {
@@ -3367,18 +3402,6 @@ function formatHours(minutes) {
     return `${hours.toFixed(1).replace(/\.0$/, "")}h`;
 }
 
-function formatCompactTimeRange(start, end) {
-    return `${formatCompactTime(start)}-${formatCompactTime(end)}`;
-}
-
-function formatCompactTime(value) {
-    const minutes = timeToMinutes(value);
-    if (minutes === null) return value || "";
-    const hours = Math.floor(minutes / 60);
-    const remainder = minutes % 60;
-    return remainder ? `${hours}:${String(remainder).padStart(2, "0")}` : String(hours);
-}
-
 function getCalendarCells(monthDate) {
     const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
     const start = new Date(first);
@@ -3461,6 +3484,24 @@ function formatPrintDate(date) {
 function formatDateRange(dates) {
     if (!dates.length) return monthTitle(currentMonth);
     return `${formatPrintDate(dates[0])} - ${formatPrintDate(dates[dates.length - 1])}`;
+}
+
+function weekTitle(dates) {
+    if (!dates.length) return monthTitle(currentMonth);
+    const first = dates[0];
+    const last = dates[dates.length - 1];
+    const sameYear = first.getFullYear() === last.getFullYear();
+    const firstLabel = new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: sameYear ? undefined : "numeric"
+    }).format(first);
+    const lastLabel = new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+    }).format(last);
+    return `${firstLabel} - ${lastLabel}`;
 }
 
 function normalizeCode(code) {
