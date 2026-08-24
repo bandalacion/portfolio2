@@ -83,6 +83,7 @@ let availabilityBuilderFilter = "available";
 let availabilityBuilderSelectedIds = new Set();
 let copiedDayShifts = null;
 let copiedWeekShifts = null;
+let activeShiftEditor = null;
 
 const dom = {};
 
@@ -123,15 +124,31 @@ function captureDom() {
         "employeeAvailabilityView",
         "managerAvailabilityView",
         "employeesView",
+        "hoursView",
         "managerWeekdays",
         "employeeWeekdays",
         "managerCalendarGrid",
         "employeeCalendarGrid",
         "scheduleMatrixWrap",
         "scheduleMatrix",
+        "shiftPopover",
+        "shiftPopoverForm",
+        "shiftPopoverDate",
+        "shiftPopoverEmployee",
+        "shiftPopoverMeta",
+        "popoverShiftTemplate",
+        "popoverShiftStart",
+        "popoverShiftEnd",
+        "popoverShiftRole",
+        "popoverShiftNote",
+        "popoverShiftPrivateNote",
+        "removePopoverShiftBtn",
+        "closeShiftPopoverBtn",
+        "shiftPopoverMessage",
         "hoursScrollPrev",
         "hoursScrollNext",
         "managerHoursSummary",
+        "managerHoursTable",
         "publishStatus",
         "copyDayBtn",
         "pasteDayBtn",
@@ -209,14 +226,14 @@ function bindEvents() {
     dom.exportPdfBtn.addEventListener("click", exportCurrentViewAsPdf);
     dom.exportPayrollBtn.addEventListener("click", exportPayrollCsv);
     dom.exportMode.addEventListener("change", updateExportControls);
-    dom.copyDayBtn.addEventListener("click", copySelectedDay);
-    dom.pasteDayBtn.addEventListener("click", pasteCopiedDay);
-    dom.copyWeekBtn.addEventListener("click", copySelectedWeek);
-    dom.pasteWeekBtn.addEventListener("click", pasteCopiedWeek);
+    if (dom.copyDayBtn) dom.copyDayBtn.addEventListener("click", copySelectedDay);
+    if (dom.pasteDayBtn) dom.pasteDayBtn.addEventListener("click", pasteCopiedDay);
+    if (dom.copyWeekBtn) dom.copyWeekBtn.addEventListener("click", copySelectedWeek);
+    if (dom.pasteWeekBtn) dom.pasteWeekBtn.addEventListener("click", pasteCopiedWeek);
     dom.publishScheduleBtn.addEventListener("click", publishCurrentMonth);
-    dom.hoursScrollPrev.addEventListener("click", () => scrollStrip(dom.managerHoursSummary, -1));
-    dom.hoursScrollNext.addEventListener("click", () => scrollStrip(dom.managerHoursSummary, 1));
-    dom.managerHoursSummary.addEventListener("scroll", updateHoursScrollControls);
+    if (dom.hoursScrollPrev) dom.hoursScrollPrev.addEventListener("click", () => scrollStrip(dom.managerHoursSummary, -1));
+    if (dom.hoursScrollNext) dom.hoursScrollNext.addEventListener("click", () => scrollStrip(dom.managerHoursSummary, 1));
+    if (dom.managerHoursSummary) dom.managerHoursSummary.addEventListener("scroll", updateHoursScrollControls);
     dom.availabilityScrollPrev.addEventListener("click", () => scrollStrip(dom.availabilityMatrixWrap, -1));
     dom.availabilityScrollNext.addEventListener("click", () => scrollStrip(dom.availabilityMatrixWrap, 1));
     dom.availabilityMatrixWrap.addEventListener("scroll", updateAvailabilityScrollControls);
@@ -228,15 +245,19 @@ function bindEvents() {
     dom.availabilityScheduleForm.addEventListener("submit", handleAvailabilityScheduleSubmit);
     if (dom.managerCalendarGrid) dom.managerCalendarGrid.addEventListener("click", handleCalendarClick);
     dom.employeeCalendarGrid.addEventListener("click", handleCalendarClick);
-    if (dom.scheduleMatrix) {
-        dom.scheduleMatrix.addEventListener("change", handleScheduleMatrixChange);
-        dom.scheduleMatrix.addEventListener("click", handleScheduleMatrixClick);
-    }
+    if (dom.scheduleMatrix) dom.scheduleMatrix.addEventListener("click", handleScheduleMatrixClick);
+    if (dom.scheduleMatrixWrap) dom.scheduleMatrixWrap.addEventListener("scroll", () => {
+        if (activeShiftEditor) positionShiftPopover(activeShiftEditor.anchor);
+    });
     if (dom.weekBuilder) dom.weekBuilder.addEventListener("click", handleWeekBuilderClick);
-    dom.coveragePanel.addEventListener("change", handleCoverageInput);
-    dom.shiftForm.addEventListener("submit", handleShiftSubmit);
-    dom.shiftTemplate.addEventListener("change", () => applyShiftTemplate(dom.shiftTemplate.value, "shift"));
-    dom.saveShiftTemplateBtn.addEventListener("click", saveCurrentShiftTemplate);
+    if (dom.coveragePanel) dom.coveragePanel.addEventListener("change", handleCoverageInput);
+    if (dom.shiftForm) dom.shiftForm.addEventListener("submit", handleShiftSubmit);
+    if (dom.shiftTemplate) dom.shiftTemplate.addEventListener("change", () => applyShiftTemplate(dom.shiftTemplate.value, "shift"));
+    if (dom.saveShiftTemplateBtn) dom.saveShiftTemplateBtn.addEventListener("click", saveCurrentShiftTemplate);
+    if (dom.shiftPopoverForm) dom.shiftPopoverForm.addEventListener("submit", handleShiftPopoverSubmit);
+    if (dom.popoverShiftTemplate) dom.popoverShiftTemplate.addEventListener("change", () => applyShiftTemplate(dom.popoverShiftTemplate.value, "popover"));
+    if (dom.removePopoverShiftBtn) dom.removePopoverShiftBtn.addEventListener("click", removeShiftFromPopover);
+    if (dom.closeShiftPopoverBtn) dom.closeShiftPopoverBtn.addEventListener("click", closeShiftPopover);
     dom.availabilityForm.addEventListener("submit", handleAvailabilitySubmit);
     dom.clearAvailabilityBtn.addEventListener("click", clearAvailability);
     dom.builderShiftTemplate.addEventListener("change", () => applyShiftTemplate(dom.builderShiftTemplate.value, "builder"));
@@ -244,8 +265,10 @@ function bindEvents() {
     dom.generateCodeBtn.addEventListener("click", fillGeneratedEmployeeCode);
     dom.employeeList.addEventListener("click", handleEmployeeListClick);
     dom.employeeList.addEventListener("change", handleEmployeeListChange);
-    dom.dayShiftList.addEventListener("click", handleShiftListClick);
+    if (dom.dayShiftList) dom.dayShiftList.addEventListener("click", handleShiftListClick);
     dom.employeeDayShifts.addEventListener("click", handleEmployeeShiftClick);
+    document.addEventListener("click", handleDocumentClick);
+    window.addEventListener("keydown", handleGlobalKeydown);
     window.addEventListener("afterprint", cleanupPdfExport);
     window.addEventListener("resize", updateScrollControls);
 
@@ -711,10 +734,12 @@ function renderActiveView() {
         schedule: dom.managerScheduleView,
         employeeAvailability: dom.employeeAvailabilityView,
         managerAvailability: dom.managerAvailabilityView,
-        employees: dom.employeesView
+        employees: dom.employeesView,
+        hours: dom.hoursView
     };
 
     Object.entries(views).forEach(([name, element]) => {
+        if (!element) return;
         element.hidden = name !== activeView;
     });
 
@@ -724,7 +749,8 @@ function renderActiveView() {
         schedule: [manager ? manager.label : "Oak34", managerTitle],
         employeeAvailability: ["Oak34", "My Month"],
         managerAvailability: [manager ? manager.label : "Oak34", "Availability"],
-        employees: [manager ? manager.label : "Oak34", "Employees"]
+        employees: [manager ? manager.label : "Oak34", "Employees"],
+        hours: [manager ? manager.label : "Oak34", "Hours"]
     };
     const [eyebrow, title] = titles[activeView] || titles.schedule;
     dom.surfaceEyebrow.textContent = eyebrow;
@@ -735,9 +761,11 @@ function renderActiveView() {
     if (activeView === "employeeAvailability") renderEmployeeAvailability();
     if (activeView === "managerAvailability") renderAvailabilityMatrix();
     if (activeView === "employees") renderEmployees();
+    if (activeView === "hours") renderManagerHoursSummary();
 }
 
 function setActiveView(view) {
+    closeShiftPopover();
     if (currentUser.type === "employee") {
         activeView = "employeeAvailability";
     } else {
@@ -752,7 +780,8 @@ function renderPrintHeading() {
         schedule: manager ? `Oak34 ${manager.label} Schedule` : "Oak34 Kitchen Schedule",
         employeeAvailability: "Oak34 Kitchen Schedule",
         managerAvailability: manager ? `Oak34 ${manager.label} Availability` : "Oak34 Kitchen Availability",
-        employees: manager ? `Oak34 ${manager.label} Team` : "Oak34 Kitchen Team"
+        employees: manager ? `Oak34 ${manager.label} Team` : "Oak34 Kitchen Team",
+        hours: manager ? `Oak34 ${manager.label} Hours` : "Oak34 Kitchen Hours"
     };
     dom.printHeading.textContent = `${titleMap[activeView] || "Calendar"} - ${monthTitle(currentMonth)}`;
 }
@@ -1252,6 +1281,7 @@ function scrollStrip(container, direction) {
 function updateScrollControls() {
     updateHoursScrollControls();
     updateAvailabilityScrollControls();
+    if (activeShiftEditor) positionShiftPopover(activeShiftEditor.anchor);
 }
 
 function updateHoursScrollControls() {
@@ -1288,16 +1318,8 @@ function renderMonthLabel() {
 
 function renderManagerSchedule() {
     renderScheduleWorkflow();
-    renderScheduleWarnings();
-    renderManagerHoursSummary();
     renderScheduleMatrix();
-    dom.managerSelectedDate.textContent = longDate(selectedDate);
-    dom.shiftFormMessage.textContent = "";
     renderShiftTemplateOptions();
-    renderCoveragePanel();
-    renderShiftEmployeeOptions();
-    renderManagerDayAvailability();
-    renderDayShifts();
 }
 
 function renderScheduleWorkflow() {
@@ -1314,11 +1336,12 @@ function renderScheduleWorkflow() {
         : "Draft has unpublished changes.";
 
     dom.publishStatus.textContent = `${status} Draft ${draftShifts}, published ${publishedShifts}. ${publishDetail}.`;
-    dom.pasteDayBtn.disabled = !copiedDayShifts;
-    dom.pasteWeekBtn.disabled = !copiedWeekShifts;
+    if (dom.pasteDayBtn) dom.pasteDayBtn.disabled = !copiedDayShifts;
+    if (dom.pasteWeekBtn) dom.pasteWeekBtn.disabled = !copiedWeekShifts;
 }
 
 function renderScheduleWarnings() {
+    if (!dom.scheduleWarnings) return;
     const warnings = getScheduleWarnings(selectedDate);
     if (!warnings.length) {
         dom.scheduleWarnings.innerHTML = "";
@@ -1356,6 +1379,7 @@ function renderScheduleWarnings() {
 }
 
 function renderCoveragePanel() {
+    if (!dom.coveragePanel) return;
     const manager = getCurrentManagerConfig();
     const groups = getCoverageTargetGroups(manager.area);
     const targets = getCoverageTargets(selectedDate, manager.area);
@@ -1409,12 +1433,11 @@ function renderScheduleMatrix() {
     const header = [
         `<div class="schedule-matrix-name schedule-matrix-corner"></div>`,
         ...days.map((date) => {
-            const dateKey = formatDate(date);
             return `
-                <button class="schedule-matrix-day ${dateKey === selectedDate ? "selected" : ""}" type="button" data-action="select-schedule-date" data-date="${dateKey}">
+                <div class="schedule-matrix-day">
                     <span>${escapeHtml(formatPrintWeekday(date))}</span>
                     <strong>${date.getDate()}</strong>
-                </button>
+                </div>
             `;
         })
     ];
@@ -1443,19 +1466,21 @@ function renderScheduleMatrixCell(employee, dateKey) {
     const scheduled = Boolean(shift);
     const status = scheduled ? "scheduled" : (availability ? availability.status : "none");
     const disabled = !scheduled && availability && availability.status === "unavailable";
-    const selected = dateKey === selectedDate;
+    const conflict = scheduled && availability && availability.status === "unavailable";
     const title = scheduled
-        ? `${employee.name}: ${shift.start}-${shift.end} ${shift.role || "Shift"}`
+        ? `${employee.name}: ${shift.start}-${shift.end} ${shift.role || "Shift"}${conflict ? " (marked unavailable)" : ""}`
         : availability
-            ? `${employee.name}: ${statusLabel(availability.status)}`
+            ? `${employee.name}: ${formatAvailabilityDetail(availability)}`
             : `${employee.name}: no availability entered`;
+    const timeHint = availability && availability.start && availability.end ? `${availability.start}-${availability.end}` : "";
+    const label = scheduled ? `${shift.start}-${shift.end}` : (statusShort(status) || "-");
 
     return `
-        <label class="schedule-check-cell ${status} ${selected ? "selected-column" : ""} ${disabled ? "disabled" : ""}" title="${escapeHtml(title)}">
-            <input type="checkbox" data-schedule-toggle data-employee-id="${escapeHtml(employee.id)}" data-date="${escapeHtml(dateKey)}" ${scheduled ? "checked" : ""} ${disabled ? "disabled" : ""}>
-            <span class="schedule-checkmark" aria-hidden="true">${scheduled ? "S" : ""}</span>
-            <small>${escapeHtml(scheduled ? `${shift.start}-${shift.end}` : (statusShort(status) || "-"))}</small>
-        </label>
+        <button class="schedule-check-cell ${status} ${conflict ? "conflict" : ""} ${disabled ? "disabled" : ""}" type="button" data-action="edit-schedule-cell" data-employee-id="${escapeHtml(employee.id)}" data-date="${escapeHtml(dateKey)}" title="${escapeHtml(title)}" aria-pressed="${scheduled ? "true" : "false"}" aria-label="${escapeHtml(title)}" ${disabled ? "disabled" : ""}>
+            <span class="schedule-checkbox ${scheduled ? "checked" : ""}" aria-hidden="true"></span>
+            <small>${escapeHtml(label)}</small>
+            ${!scheduled && timeHint ? `<em>${escapeHtml(timeHint)}</em>` : ""}
+        </button>
     `;
 }
 
@@ -1531,8 +1556,9 @@ function renderShiftTemplateOptions() {
         `<option value="">Custom shift</option>`,
         ...templates.map((template) => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)} (${escapeHtml(template.start)}-${escapeHtml(template.end)})</option>`)
     ].join("");
-    dom.shiftTemplate.innerHTML = options;
-    dom.builderShiftTemplate.innerHTML = options;
+    if (dom.shiftTemplate) dom.shiftTemplate.innerHTML = options;
+    if (dom.builderShiftTemplate) dom.builderShiftTemplate.innerHTML = options;
+    if (dom.popoverShiftTemplate) dom.popoverShiftTemplate.innerHTML = options;
 }
 
 function renderEmployeeAvailability() {
@@ -1629,6 +1655,7 @@ function renderEmployeeShiftPills(dateKey) {
 }
 
 function renderShiftEmployeeOptions() {
+    if (!dom.shiftEmployee || !dom.shiftForm) return;
     const employees = getManagerEmployees();
     const bookedEmployeeIds = new Set((state.shifts[selectedDate] || []).map((shift) => shift.employeeId));
     const firstAvailableEmployee = employees.find(canSelectAvailabilityBuilderEmployee);
@@ -1664,6 +1691,7 @@ function renderManagerHoursSummary() {
     const employees = getManagerEmployees();
     if (!employees.length) {
         dom.managerHoursSummary.innerHTML = `<p class="empty-state">No employees have been added yet.</p>`;
+        if (dom.managerHoursTable) dom.managerHoursTable.innerHTML = "";
         requestAnimationFrame(updateHoursScrollControls);
         return;
     }
@@ -1689,6 +1717,33 @@ function renderManagerHoursSummary() {
         `)
     ];
     dom.managerHoursSummary.innerHTML = cards.join("");
+    if (dom.managerHoursTable) {
+        dom.managerHoursTable.innerHTML = `
+            <thead>
+                <tr>
+                    <th>Employee</th>
+                    <th>Group</th>
+                    <th>Shifts</th>
+                    <th>Hours</th>
+                    <th>Average</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${totals.map(({ employee, minutes, shifts }) => {
+                    const average = shifts ? Math.round(minutes / shifts) : 0;
+                    return `
+                        <tr>
+                            <th>${escapeHtml(employee.name)}</th>
+                            <td>${escapeHtml(employeeCategoryLabel(employee))}</td>
+                            <td>${shifts}</td>
+                            <td>${formatHours(minutes)}</td>
+                            <td>${average ? formatHours(average) : "-"}</td>
+                        </tr>
+                    `;
+                }).join("")}
+            </tbody>
+        `;
+    }
     requestAnimationFrame(updateHoursScrollControls);
 }
 
@@ -1704,6 +1759,7 @@ function renderEmployeeHoursSummary(employeeId) {
 }
 
 function renderManagerDayAvailability() {
+    if (!dom.managerDayAvailability) return;
     const employees = getManagerEmployees();
     if (!employees.length) {
         dom.managerDayAvailability.innerHTML = `<p class="empty-state">No employees have been added yet.</p>`;
@@ -1737,6 +1793,7 @@ function renderManagerDayAvailability() {
 }
 
 function renderDayShifts() {
+    if (!dom.dayShiftList) return;
     const visibleEmployeeIds = new Set(getManagerEmployees().map((employee) => employee.id));
     const shifts = sortShiftsByStart((state.shifts[selectedDate] || []).filter((shift) => visibleEmployeeIds.has(shift.employeeId)));
     if (!shifts.length) {
@@ -2106,18 +2163,12 @@ function handleManagerAvailabilityClick(event) {
 }
 
 function handleScheduleMatrixClick(event) {
-    const dayButton = event.target.closest("[data-action='select-schedule-date']");
-    if (!dayButton) return;
-    setSelectedDate(parseDate(dayButton.dataset.date));
+    const cellButton = event.target.closest("[data-action='edit-schedule-cell']");
+    if (!cellButton) return;
+    openShiftPopover(cellButton.dataset.employeeId, cellButton.dataset.date, cellButton);
 }
 
-function handleScheduleMatrixChange(event) {
-    const checkbox = event.target.closest("[data-schedule-toggle]");
-    if (!checkbox) return;
-    toggleScheduleMatrixShift(checkbox.dataset.employeeId, checkbox.dataset.date, checkbox.checked);
-}
-
-function toggleScheduleMatrixShift(employeeId, dateKey, shouldSchedule) {
+function openShiftPopover(employeeId, dateKey, anchor) {
     const employee = getEmployee(employeeId);
     const manager = getCurrentManagerConfig();
     if (!employee || getEmployeeArea(employee) !== manager.area) return;
@@ -2127,40 +2178,141 @@ function toggleScheduleMatrixShift(employeeId, dateKey, shouldSchedule) {
     availabilityBuilderSelectedIds.clear();
     renderMonthLabel();
 
-    if (!shouldSchedule) {
-        removeEmployeeShiftsOnDate(employee.id, dateKey);
-        saveState();
-        renderManagerSchedule();
-        dom.shiftFormMessage.textContent = `Removed ${employee.name} from ${longDate(dateKey)}.`;
-        return;
-    }
-
     const availability = getAvailability(employee.id, dateKey);
-    if (availability && availability.status === "unavailable") {
-        renderManagerSchedule();
-        dom.shiftFormMessage.textContent = `${employee.name} is unavailable on ${longDate(dateKey)}.`;
+    const shift = getEmployeeShiftsForDate(employee.id, dateKey)[0];
+    if (!shift && availability && availability.status === "unavailable") {
         return;
     }
 
-    if (hasEmployeeShiftOnDate(employee.id, dateKey)) {
-        renderManagerSchedule();
-        dom.shiftFormMessage.textContent = `${employee.name} already has a shift on ${longDate(dateKey)}.`;
-        return;
-    }
-
-    const shift = createShift({
+    activeShiftEditor = {
         employeeId: employee.id,
-        start: dom.shiftStart.value || "09:00",
-        end: dom.shiftEnd.value || "17:00",
-        role: dom.shiftRole.value.trim(),
-        note: dom.shiftNote.value.trim(),
-        privateNote: dom.shiftPrivateNote.value.trim()
-    });
+        dateKey,
+        shiftId: shift ? shift.id : null,
+        anchor
+    };
 
-    state.shifts[dateKey] = [...(state.shifts[dateKey] || []), shift];
+    renderShiftTemplateOptions();
+    dom.shiftPopoverDate.textContent = `${formatPrintWeekday(parseDate(dateKey))} ${formatPrintDate(parseDate(dateKey))}`;
+    dom.shiftPopoverEmployee.textContent = employee.name;
+    dom.shiftPopoverMeta.textContent = availability ? formatAvailabilityDetail(availability) : "No availability added";
+    dom.popoverShiftTemplate.value = "";
+    dom.popoverShiftStart.value = shift ? shift.start : (availability && availability.start ? availability.start : "09:00");
+    dom.popoverShiftEnd.value = shift ? shift.end : (availability && availability.end ? availability.end : "17:00");
+    dom.popoverShiftRole.value = shift ? shift.role : (employee.role || employeeCategoryLabel(employee));
+    dom.popoverShiftNote.value = shift ? shift.note : "";
+    dom.popoverShiftPrivateNote.value = shift ? shift.privateNote : "";
+    dom.shiftPopoverMessage.textContent = "";
+    dom.removePopoverShiftBtn.hidden = !shift;
+    dom.shiftPopover.hidden = false;
+    positionShiftPopover(anchor);
+    requestAnimationFrame(() => dom.popoverShiftStart.focus());
+    refreshIcons();
+}
+
+function handleShiftPopoverSubmit(event) {
+    event.preventDefault();
+    if (!activeShiftEditor) return;
+
+    const { employeeId, dateKey, shiftId } = activeShiftEditor;
+    const employee = getEmployee(employeeId);
+    if (!employee) {
+        closeShiftPopover();
+        renderManagerSchedule();
+        return;
+    }
+
+    const availability = getAvailability(employeeId, dateKey);
+    if (!shiftId && availability && availability.status === "unavailable") {
+        dom.shiftPopoverMessage.textContent = `${employee.name} is unavailable on ${longDate(dateKey)}.`;
+        return;
+    }
+
+    const start = dom.popoverShiftStart.value;
+    const end = dom.popoverShiftEnd.value;
+    if (timeToMinutes(start) === null || timeToMinutes(end) === null || start === end) {
+        dom.shiftPopoverMessage.textContent = "Add a valid start and end time.";
+        return;
+    }
+
+    const existingShifts = state.shifts[dateKey] || [];
+    const existingShift = shiftId ? existingShifts.find((shift) => shift.id === shiftId) : null;
+    if (!existingShift && hasEmployeeShiftOnDate(employeeId, dateKey)) {
+        dom.shiftPopoverMessage.textContent = `${employee.name} already has a shift on ${longDate(dateKey)}.`;
+        return;
+    }
+
+    if (existingShift) {
+        existingShift.start = start;
+        existingShift.end = end;
+        existingShift.role = dom.popoverShiftRole.value.trim();
+        existingShift.note = dom.popoverShiftNote.value.trim();
+        existingShift.privateNote = dom.popoverShiftPrivateNote.value.trim();
+        delete state.confirmations[existingShift.id];
+        state.swapRequests = state.swapRequests.filter((request) => request.shiftId !== existingShift.id);
+    } else {
+        const shift = createShift({
+            employeeId,
+            start,
+            end,
+            role: dom.popoverShiftRole.value.trim(),
+            note: dom.popoverShiftNote.value.trim(),
+            privateNote: dom.popoverShiftPrivateNote.value.trim()
+        });
+        state.shifts[dateKey] = [...existingShifts, shift];
+    }
+
     saveState();
+    closeShiftPopover();
     renderManagerSchedule();
-    dom.shiftFormMessage.textContent = `Added ${employee.name} on ${longDate(dateKey)} from ${shift.start} to ${shift.end}.`;
+}
+
+function removeShiftFromPopover() {
+    if (!activeShiftEditor) return;
+    const { employeeId, dateKey, shiftId } = activeShiftEditor;
+    if (shiftId) {
+        removeShiftById(dateKey, shiftId);
+    } else {
+        removeEmployeeShiftsOnDate(employeeId, dateKey);
+    }
+    saveState();
+    closeShiftPopover();
+    renderManagerSchedule();
+}
+
+function positionShiftPopover(anchor) {
+    if (!dom.shiftPopover || !anchor || dom.shiftPopover.hidden) return;
+    const anchorRect = anchor.getBoundingClientRect();
+    const popoverRect = dom.shiftPopover.getBoundingClientRect();
+    const gap = 8;
+    let left = anchorRect.left + (anchorRect.width / 2) - (popoverRect.width / 2);
+    let top = anchorRect.bottom + gap;
+
+    left = Math.max(12, Math.min(left, window.innerWidth - popoverRect.width - 12));
+    if (top + popoverRect.height > window.innerHeight - 12) {
+        top = Math.max(12, anchorRect.top - popoverRect.height - gap);
+    }
+
+    dom.shiftPopover.style.left = `${left}px`;
+    dom.shiftPopover.style.top = `${top}px`;
+}
+
+function closeShiftPopover() {
+    if (!dom.shiftPopover) return;
+    dom.shiftPopover.hidden = true;
+    dom.shiftPopover.style.left = "";
+    dom.shiftPopover.style.top = "";
+    activeShiftEditor = null;
+    if (dom.shiftPopoverMessage) dom.shiftPopoverMessage.textContent = "";
+}
+
+function handleDocumentClick(event) {
+    if (!dom.shiftPopover || dom.shiftPopover.hidden) return;
+    if (event.target.closest("#shiftPopover") || event.target.closest("[data-action='edit-schedule-cell']")) return;
+    closeShiftPopover();
+}
+
+function handleGlobalKeydown(event) {
+    if (event.key === "Escape") closeShiftPopover();
 }
 
 function removeEmployeeShiftsOnDate(employeeId, dateKey) {
@@ -2172,6 +2324,14 @@ function removeEmployeeShiftsOnDate(employeeId, dateKey) {
         delete state.confirmations[shiftId];
     });
     state.swapRequests = state.swapRequests.filter((request) => !removedIds.includes(request.shiftId));
+}
+
+function removeShiftById(dateKey, shiftId) {
+    const shifts = state.shifts[dateKey] || [];
+    state.shifts[dateKey] = shifts.filter((shift) => shift.id !== shiftId);
+    if (!state.shifts[dateKey].length) delete state.shifts[dateKey];
+    delete state.confirmations[shiftId];
+    state.swapRequests = state.swapRequests.filter((request) => request.shiftId !== shiftId);
 }
 
 function quickAddAvailabilityShift(employeeId, dateKey) {
@@ -2517,7 +2677,7 @@ function copySelectedDay() {
         sourceDate: selectedDate,
         shifts: getDateShiftsForArea(selectedDate, manager.area, state.shifts).map((shift) => cloneShift(shift))
     };
-    dom.shiftFormMessage.textContent = `${copiedDayShifts.shifts.length} ${copiedDayShifts.shifts.length === 1 ? "shift" : "shifts"} copied from ${longDate(selectedDate)}.`;
+    if (dom.shiftFormMessage) dom.shiftFormMessage.textContent = `${copiedDayShifts.shifts.length} ${copiedDayShifts.shifts.length === 1 ? "shift" : "shifts"} copied from ${longDate(selectedDate)}.`;
     renderScheduleWorkflow();
 }
 
@@ -2528,14 +2688,14 @@ function pasteCopiedDay() {
         .map((shift) => createShift(shift));
 
     if (!additions.length) {
-        dom.shiftFormMessage.textContent = "No shifts pasted because everyone copied is already scheduled that day.";
+        if (dom.shiftFormMessage) dom.shiftFormMessage.textContent = "No shifts pasted because everyone copied is already scheduled that day.";
         renderShiftEmployeeOptions();
         return;
     }
 
     state.shifts[selectedDate] = [...(state.shifts[selectedDate] || []), ...additions];
     saveState();
-    dom.shiftFormMessage.textContent = `Pasted ${additions.length} ${additions.length === 1 ? "shift" : "shifts"} into ${longDate(selectedDate)}.`;
+    if (dom.shiftFormMessage) dom.shiftFormMessage.textContent = `Pasted ${additions.length} ${additions.length === 1 ? "shift" : "shifts"} into ${longDate(selectedDate)}.`;
     renderManagerSchedule();
 }
 
@@ -2550,7 +2710,7 @@ function copySelectedWeek() {
         }))
     };
     const copiedCount = copiedWeekShifts.days.reduce((sum, day) => sum + day.shifts.length, 0);
-    dom.shiftFormMessage.textContent = `${copiedCount} ${copiedCount === 1 ? "shift" : "shifts"} copied from the week of ${formatPrintDate(week[0])}.`;
+    if (dom.shiftFormMessage) dom.shiftFormMessage.textContent = `${copiedCount} ${copiedCount === 1 ? "shift" : "shifts"} copied from the week of ${formatPrintDate(week[0])}.`;
     renderScheduleWorkflow();
 }
 
@@ -2570,9 +2730,11 @@ function pasteCopiedWeek() {
     });
 
     saveState();
-    dom.shiftFormMessage.textContent = pasted
-        ? `Pasted ${pasted} ${pasted === 1 ? "shift" : "shifts"} into the selected week.`
-        : "No shifts pasted because the copied employees were already scheduled.";
+    if (dom.shiftFormMessage) {
+        dom.shiftFormMessage.textContent = pasted
+            ? `Pasted ${pasted} ${pasted === 1 ? "shift" : "shifts"} into the selected week.`
+            : "No shifts pasted because the copied employees were already scheduled.";
+    }
     renderManagerSchedule();
 }
 
@@ -2646,6 +2808,16 @@ function applyShiftTemplate(templateId, target) {
         return;
     }
 
+    if (target === "popover") {
+        dom.popoverShiftRole.value = template.role;
+        dom.popoverShiftStart.value = template.start;
+        dom.popoverShiftEnd.value = template.end;
+        dom.popoverShiftNote.value = template.note;
+        dom.popoverShiftPrivateNote.value = template.privateNote || "";
+        return;
+    }
+
+    if (!dom.shiftRole) return;
     dom.shiftRole.value = template.role;
     dom.shiftStart.value = template.start;
     dom.shiftEnd.value = template.end;
@@ -2655,6 +2827,7 @@ function applyShiftTemplate(templateId, target) {
 
 function saveCurrentShiftTemplate() {
     const manager = getCurrentManagerConfig();
+    if (!dom.shiftRole) return;
     const fallbackName = dom.shiftRole.value.trim() || `${dom.shiftStart.value}-${dom.shiftEnd.value}`;
     const name = window.prompt("Template name", fallbackName);
     if (!name) return;
@@ -2797,6 +2970,7 @@ function getScheduleWarnings(dateKey) {
 }
 
 function changeMonth(delta) {
+    closeShiftPopover();
     currentMonth = addMonths(currentMonth, delta);
     selectedDate = formatDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
     availabilityBuilderSelectedIds.clear();
@@ -2819,6 +2993,7 @@ function jumpBuilderToToday() {
 }
 
 function setSelectedDate(date) {
+    closeShiftPopover();
     currentMonth = startOfMonth(date);
     selectedDate = formatDate(date);
     availabilityBuilderSelectedIds.clear();

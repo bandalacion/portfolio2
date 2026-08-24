@@ -70,6 +70,10 @@
                     <i data-lucide="user-cog"></i>
                     <span>Employees</span>
                 </button>
+                <button class="side-nav-item manager-only" type="button" data-view="hours">
+                    <i data-lucide="clock-3"></i>
+                    <span>Hours</span>
+                </button>
                 <button class="side-nav-item employee-only" type="button" data-view="employeeAvailability">
                     <i data-lucide="calendar-check"></i>
                     <span>My Month</span>
@@ -115,7 +119,7 @@
             <div class="print-heading" id="printHeading"></div>
             <section class="print-packet" id="printPacket" aria-hidden="true"></section>
 
-            <div class="view-grid" id="managerScheduleView">
+            <div class="schedule-view" id="managerScheduleView">
                 <div class="calendar-surface">
                     <div class="workflow-strip">
                         <div>
@@ -128,47 +132,13 @@
                                 <i data-lucide="send"></i>
                                 <span>Publish month</span>
                             </button>
-                            <details class="tool-drawer">
-                                <summary>
-                                    <i data-lucide="sliders-horizontal"></i>
-                                    <span>More tools</span>
-                                </summary>
-                                <div class="tool-drawer-panel">
-                                    <button class="secondary-button" id="copyDayBtn" type="button">
-                                        <i data-lucide="copy"></i>
-                                        <span>Copy day</span>
-                                    </button>
-                                    <button class="secondary-button" id="pasteDayBtn" type="button" disabled>
-                                        <i data-lucide="clipboard-paste"></i>
-                                        <span>Paste day</span>
-                                    </button>
-                                    <button class="secondary-button" id="copyWeekBtn" type="button">
-                                        <i data-lucide="copy-check"></i>
-                                        <span>Copy week</span>
-                                    </button>
-                                    <button class="secondary-button" id="pasteWeekBtn" type="button" disabled>
-                                        <i data-lucide="calendar-plus"></i>
-                                        <span>Paste week</span>
-                                    </button>
-                                </div>
-                            </details>
                         </div>
-                    </div>
-                    <div class="warning-list" id="scheduleWarnings"></div>
-                    <div class="hours-carousel" aria-label="Monthly worked hours">
-                        <button class="icon-button hours-scroll-btn" id="hoursScrollPrev" type="button" aria-label="Previous employee totals" title="Previous employee totals">
-                            <i data-lucide="chevron-left"></i>
-                        </button>
-                        <div class="hours-summary" id="managerHoursSummary" aria-label="Monthly worked hours summary" tabindex="0"></div>
-                        <button class="icon-button hours-scroll-btn" id="hoursScrollNext" type="button" aria-label="Next employee totals" title="Next employee totals">
-                            <i data-lucide="chevron-right"></i>
-                        </button>
                     </div>
                     <div class="schedule-matrix-head">
                         <div>
-                            <p class="eyebrow">Monthly builder</p>
-                            <h2>Availability schedule grid</h2>
-                            <span>Tick a cell to add a shift. Untick it to remove the shift.</span>
+                            <p class="eyebrow">Monthly schedule</p>
+                            <h2>Availability grid</h2>
+                            <span>Click a cell to add or edit that employee's shift hours.</span>
                         </div>
                         <div class="legend">
                             <span><b class="dot available"></b>Available</span>
@@ -180,59 +150,66 @@
                     <div class="schedule-matrix-wrap" id="scheduleMatrixWrap">
                         <div class="schedule-matrix" id="scheduleMatrix"></div>
                     </div>
-                </div>
-                <aside class="day-panel">
-                    <div class="panel-heading">
-                        <p class="eyebrow">Selected day</p>
-                        <h2 id="managerSelectedDate"></h2>
-                    </div>
-                    <div class="coverage-panel" id="coveragePanel"></div>
-                    <div class="availability-list" id="managerDayAvailability"></div>
-                    <form class="shift-form" id="shiftForm">
-                        <label class="field-group">
-                            <span>Template</span>
-                            <select id="shiftTemplate"></select>
-                        </label>
-                        <div class="form-grid">
+                    <div class="shift-popover" id="shiftPopover" hidden>
+                        <form class="shift-popover-form" id="shiftPopoverForm">
+                            <div class="shift-popover-head">
+                                <div>
+                                    <p class="eyebrow" id="shiftPopoverDate">Shift</p>
+                                    <h3 id="shiftPopoverEmployee"></h3>
+                                    <span id="shiftPopoverMeta"></span>
+                                </div>
+                                <button class="icon-button" id="closeShiftPopoverBtn" type="button" aria-label="Close shift editor" title="Close">
+                                    <i data-lucide="x"></i>
+                                </button>
+                            </div>
                             <label class="field-group">
-                                <span>Employee</span>
-                                <select id="shiftEmployee" required></select>
+                                <span>Template</span>
+                                <select id="popoverShiftTemplate"></select>
                             </label>
+                            <div class="form-grid popover-time-grid">
+                                <label class="field-group">
+                                    <span>Start</span>
+                                    <input id="popoverShiftStart" type="time" value="09:00" required>
+                                </label>
+                                <label class="field-group">
+                                    <span>End</span>
+                                    <input id="popoverShiftEnd" type="time" value="17:00" required>
+                                </label>
+                            </div>
                             <label class="field-group">
                                 <span>Role</span>
-                                <input id="shiftRole" type="text" placeholder="Shift role">
+                                <input id="popoverShiftRole" type="text" placeholder="Shift role">
                             </label>
-                            <label class="field-group">
-                                <span>Start</span>
-                                <input id="shiftStart" type="time" value="09:00" required>
-                            </label>
-                            <label class="field-group">
-                                <span>End</span>
-                                <input id="shiftEnd" type="time" value="17:00" required>
-                            </label>
-                        </div>
-                        <label class="field-group">
-                            <span>Note</span>
-                            <input id="shiftNote" type="text" placeholder="Optional note">
-                        </label>
-                        <label class="field-group">
-                            <span>Private manager note</span>
-                            <input id="shiftPrivateNote" type="text" placeholder="Only managers can see this">
-                        </label>
-                        <div class="button-row">
-                            <button class="primary-button" type="submit">
-                                <i data-lucide="plus"></i>
-                                <span>Add shift</span>
-                            </button>
-                            <button class="secondary-button" id="saveShiftTemplateBtn" type="button">
-                                <i data-lucide="bookmark-plus"></i>
-                                <span>Save template</span>
-                            </button>
-                        </div>
-                        <p class="form-message" id="shiftFormMessage" role="alert"></p>
-                    </form>
-                    <div class="shift-list" id="dayShiftList"></div>
-                </aside>
+                            <details class="popover-more">
+                                <summary>
+                                    <i data-lucide="file-text"></i>
+                                    <span>Notes</span>
+                                </summary>
+                                <div class="popover-note-grid">
+                                    <label class="field-group">
+                                        <span>Note</span>
+                                        <input id="popoverShiftNote" type="text" placeholder="Optional note">
+                                    </label>
+                                    <label class="field-group">
+                                        <span>Private manager note</span>
+                                        <input id="popoverShiftPrivateNote" type="text" placeholder="Only managers can see this">
+                                    </label>
+                                </div>
+                            </details>
+                            <div class="button-row popover-actions">
+                                <button class="primary-button" type="submit">
+                                    <i data-lucide="check"></i>
+                                    <span>Save shift</span>
+                                </button>
+                                <button class="secondary-button" id="removePopoverShiftBtn" type="button">
+                                    <i data-lucide="trash-2"></i>
+                                    <span>Remove</span>
+                                </button>
+                            </div>
+                            <p class="form-message" id="shiftPopoverMessage" role="alert"></p>
+                        </form>
+                    </div>
+                </div>
             </div>
 
             <div class="view-grid" id="employeeAvailabilityView" hidden>
@@ -444,6 +421,29 @@
                     <p class="form-message" id="employeeFormMessage" role="alert"></p>
                 </form>
                 <div class="employee-list" id="employeeList"></div>
+            </div>
+
+            <div class="stack-view" id="hoursView" hidden>
+                <div class="calendar-surface hours-surface">
+                    <div class="matrix-head">
+                        <div>
+                            <p class="eyebrow">Payroll</p>
+                            <h2>Monthly hours</h2>
+                        </div>
+                    </div>
+                    <div class="hours-carousel" aria-label="Monthly worked hours">
+                        <button class="icon-button hours-scroll-btn" id="hoursScrollPrev" type="button" aria-label="Previous employee totals" title="Previous employee totals">
+                            <i data-lucide="chevron-left"></i>
+                        </button>
+                        <div class="hours-summary" id="managerHoursSummary" aria-label="Monthly worked hours summary" tabindex="0"></div>
+                        <button class="icon-button hours-scroll-btn" id="hoursScrollNext" type="button" aria-label="Next employee totals" title="Next employee totals">
+                            <i data-lucide="chevron-right"></i>
+                        </button>
+                    </div>
+                    <div class="hours-table-wrap">
+                        <table class="hours-table" id="managerHoursTable"></table>
+                    </div>
+                </div>
             </div>
         </section>
     </main>
