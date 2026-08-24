@@ -40,24 +40,34 @@
     </header>
 
     <main class="login-view" id="loginView">
-        <section class="login-panel" aria-labelledby="loginTitle">
-            <div class="login-mark oak-logo-mark" aria-hidden="true"></div>
-            <p class="eyebrow">Oak34 kitchen</p>
-            <h1 id="loginTitle">Sign in with your access code</h1>
-            <form class="login-form" id="loginForm">
-                <label class="field-label" for="accessCode">Access code</label>
-                <div class="code-field">
-                    <input id="accessCode" name="accessCode" type="password" autocomplete="one-time-code" placeholder="Enter code" required>
-                    <button class="icon-button" id="toggleCodeBtn" type="button" aria-label="Show access code" title="Show access code">
-                        <i data-lucide="eye"></i>
+        <section class="login-card" aria-labelledby="loginTitle">
+            <div class="login-welcome">
+                <span class="login-orb login-orb-top" aria-hidden="true"></span>
+                <span class="login-orb login-orb-bottom" aria-hidden="true"></span>
+                <div class="login-mark oak-logo-mark" aria-hidden="true"></div>
+                <p class="eyebrow">Oak34 kitchen</p>
+                <h2>Welcome Back!</h2>
+                <p>Manager and employee access for the Oak34 team schedule.</p>
+            </div>
+            <div class="login-panel">
+                <div class="login-panel-brand oak-logo-mark" aria-hidden="true"></div>
+                <p class="eyebrow">Team schedule</p>
+                <h1 id="loginTitle">Sign in</h1>
+                <form class="login-form" id="loginForm">
+                    <label class="field-label" for="accessCode">Access code</label>
+                    <div class="code-field">
+                        <input id="accessCode" name="accessCode" type="password" autocomplete="one-time-code" placeholder="Enter code" required>
+                        <button class="icon-button" id="toggleCodeBtn" type="button" aria-label="Show access code" title="Show access code">
+                            <i data-lucide="eye"></i>
+                        </button>
+                    </div>
+                    <button class="primary-button" type="submit">
+                        <i data-lucide="log-in"></i>
+                        <span>Sign in</span>
                     </button>
-                </div>
-                <button class="primary-button" type="submit">
-                    <i data-lucide="log-in"></i>
-                    <span>Sign in</span>
-                </button>
-                <p class="form-message" id="loginMessage" role="alert"></p>
-            </form>
+                    <p class="form-message" id="loginMessage" role="alert"></p>
+                </form>
+            </div>
         </section>
     </main>
 

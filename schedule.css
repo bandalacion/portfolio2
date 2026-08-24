@@ -306,31 +306,100 @@ a {
     display: grid;
     place-items: center;
     min-height: calc(100vh - 69px);
-    padding: 2rem;
+    padding: clamp(1.2rem, 4vw, 3rem);
+}
+
+.login-card {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(280px, 0.88fr) minmax(320px, 1.12fr);
+    width: min(100%, 980px);
+    min-height: 560px;
+    overflow: hidden;
+    border: 1px solid rgba(210, 217, 226, 0.72);
+    border-radius: 8px;
+    background: rgba(238, 243, 248, 0.9);
+    box-shadow: 0 26px 68px rgba(39, 55, 77, 0.18);
+}
+
+.login-welcome,
+.login-panel {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    align-content: center;
+    justify-items: center;
+    min-width: 0;
+    padding: clamp(2rem, 5vw, 4rem);
+    text-align: center;
+}
+
+.login-welcome {
+    overflow: hidden;
+    background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(235, 241, 247, 0.82)),
+        radial-gradient(circle at 12% 90%, rgba(157, 52, 72, 0.08), transparent 34%);
+}
+
+.login-welcome::after {
+    content: "";
+    position: absolute;
+    inset: auto auto 12% 50%;
+    z-index: -1;
+    width: 220px;
+    height: 220px;
+    background: var(--oak34-logo) center / contain no-repeat;
+    opacity: 0.07;
+    transform: translateX(-50%) rotate(-8deg);
+}
+
+.login-orb {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(210, 217, 226, 0.58);
+    background: rgba(255, 255, 255, 0.28);
+    box-shadow: inset 0 0 36px rgba(255, 255, 255, 0.7);
+    pointer-events: none;
+}
+
+.login-orb-top {
+    top: -150px;
+    right: -120px;
+    width: 300px;
+    height: 300px;
+}
+
+.login-orb-bottom {
+    bottom: -170px;
+    left: -120px;
+    width: 330px;
+    height: 330px;
 }
 
 .login-panel {
-    width: min(100%, 430px);
-    padding: 2rem;
-    border: 1px solid var(--line);
+    background: rgba(232, 238, 244, 0.86);
+}
+
+.login-panel-brand {
+    display: none;
+    width: 56px;
+    height: 56px;
+    margin-bottom: 1.1rem;
     border-radius: 8px;
-    background: var(--surface);
-    box-shadow: var(--shadow);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
 }
 
 .login-mark {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 1.5rem;
+    width: 76px;
+    height: 76px;
+    margin-bottom: 1.35rem;
     border-radius: 8px;
-    background-color: rgba(157, 52, 72, 0.12);
+    background-color: rgba(255, 255, 255, 0.86);
     color: var(--blue);
+    box-shadow: 0 18px 38px rgba(157, 52, 72, 0.12);
 }
 
 .login-mark.oak-logo-mark {
-    background-color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(255, 255, 255, 0.86);
     background-image: var(--oak34-logo);
     background-size: 66% auto;
 }
@@ -350,9 +419,28 @@ p {
 }
 
 .login-panel h1 {
-    margin-bottom: 1.5rem;
-    font-size: 2rem;
+    margin-bottom: 1.65rem;
+    font-size: clamp(2.3rem, 5vw, 3rem);
     line-height: 1.1;
+}
+
+.login-welcome h2 {
+    margin-bottom: 1rem;
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    line-height: 1.05;
+}
+
+.login-welcome p:last-child {
+    max-width: 310px;
+    margin-bottom: 0;
+    color: rgba(110, 110, 115, 0.78);
+    font-size: 1.02rem;
+    font-weight: 650;
+    line-height: 1.45;
+}
+
+.login-panel > .eyebrow {
+    margin-bottom: 0.55rem;
 }
 
 .login-form,
@@ -361,6 +449,40 @@ p {
 .employee-form {
     display: grid;
     gap: 1rem;
+}
+
+.login-form {
+    width: min(100%, 360px);
+    justify-items: stretch;
+}
+
+.login-form .field-label {
+    justify-self: start;
+}
+
+.login-form input {
+    min-height: 54px;
+    border-color: rgba(198, 207, 218, 0.66);
+    background: rgba(246, 249, 252, 0.92);
+    box-shadow: inset 0 2px 8px rgba(39, 55, 77, 0.08);
+}
+
+.login-form .code-field .icon-button {
+    top: 7px;
+}
+
+.login-form .primary-button {
+    justify-self: center;
+    min-width: 190px;
+    min-height: 54px;
+    margin-top: 0.5rem;
+    border-radius: 999px;
+    background: var(--blue);
+    box-shadow: 0 16px 34px rgba(157, 52, 72, 0.18);
+    font-size: 0.9rem;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
 }
 
 .field-label,
@@ -2544,6 +2666,28 @@ svg {
         grid-template-columns: 1fr;
     }
 
+    .login-card {
+        grid-template-columns: 1fr;
+        min-height: 0;
+    }
+
+    .login-welcome {
+        min-height: 280px;
+    }
+
+    .login-panel {
+        padding-top: 2.4rem;
+        padding-bottom: 2.4rem;
+    }
+
+    .login-panel-brand {
+        display: inline-flex;
+    }
+
+    .login-mark {
+        display: none;
+    }
+
     .sidebar {
         position: static;
     }
@@ -2587,9 +2731,37 @@ svg {
     .planner,
     .calendar-surface,
     .day-panel,
-    .employee-form,
-    .login-panel {
+    .employee-form {
         padding: 0.85rem;
+    }
+
+    .login-view {
+        min-height: calc(100vh - 63px);
+    }
+
+    .login-card {
+        width: 100%;
+    }
+
+    .login-welcome,
+    .login-panel {
+        padding: 1.35rem;
+    }
+
+    .login-welcome {
+        min-height: 240px;
+    }
+
+    .login-welcome h2 {
+        font-size: 2rem;
+    }
+
+    .login-welcome p:last-child {
+        font-size: 0.95rem;
+    }
+
+    .login-panel h1 {
+        font-size: 2.25rem;
     }
 
     .planner-head,
