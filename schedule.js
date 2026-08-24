@@ -87,6 +87,7 @@ let availabilityBuilderSelectedIds = new Set();
 let copiedDayShifts = null;
 let copiedWeekShifts = null;
 let activeShiftEditor = null;
+let activeEmployeeProfileId = null;
 let loadingDismissed = false;
 let loadingAnimationFrame = null;
 
@@ -214,12 +215,30 @@ function captureDom() {
         "employeeForm",
         "employeeName",
         "employeeRole",
+        "employeePhoto",
+        "employeeEmail",
+        "employeePhone",
+        "employeeNotes",
         "employeeCategoryGroup",
         "employeeCategory",
         "employeeCode",
         "generateCodeBtn",
         "employeeFormMessage",
-        "employeeList"
+        "employeeList",
+        "employeeInfoOverlay",
+        "employeeInfoForm",
+        "employeeInfoPhoto",
+        "employeeInfoName",
+        "employeeInfoRole",
+        "employeeInfoMeta",
+        "employeeInfoCode",
+        "employeeInfoPhotoInput",
+        "employeeInfoEmailInput",
+        "employeeInfoPhoneInput",
+        "employeeInfoNotes",
+        "employeeInfoRemovePhotoBtn",
+        "closeEmployeeInfoBtn",
+        "employeeInfoMessage"
     ].forEach((id) => {
         dom[id] = document.getElementById(id);
     });
@@ -274,6 +293,14 @@ function bindEvents() {
     dom.generateCodeBtn.addEventListener("click", fillGeneratedEmployeeCode);
     dom.employeeList.addEventListener("click", handleEmployeeListClick);
     dom.employeeList.addEventListener("change", handleEmployeeListChange);
+    if (dom.employeeInfoForm) dom.employeeInfoForm.addEventListener("submit", handleEmployeeInfoSubmit);
+    if (dom.closeEmployeeInfoBtn) dom.closeEmployeeInfoBtn.addEventListener("click", closeEmployeeInfo);
+    if (dom.employeeInfoRemovePhotoBtn) dom.employeeInfoRemovePhotoBtn.addEventListener("click", removeEmployeeInfoPhoto);
+    if (dom.employeeInfoOverlay) {
+        dom.employeeInfoOverlay.addEventListener("click", (event) => {
+            if (event.target === dom.employeeInfoOverlay) closeEmployeeInfo();
+        });
+    }
     if (dom.dayShiftList) dom.dayShiftList.addEventListener("click", handleShiftListClick);
     dom.employeeDayShifts.addEventListener("click", handleEmployeeShiftClick);
     document.addEventListener("click", handleDocumentClick);
@@ -410,8 +437,22 @@ function normalizeEmployee(employee) {
         ...employee,
         area,
         category,
-        order: Number.isFinite(order) ? order : null
+        order: Number.isFinite(order) ? order : null,
+        photo: normalizeEmployeePhoto(employee.photo),
+        email: cleanEmployeeText(employee.email),
+        phone: cleanEmployeeText(employee.phone),
+        notes: cleanEmployeeText(employee.notes)
     };
+}
+
+function cleanEmployeeText(value) {
+    return String(value || "").trim();
+}
+
+function normalizeEmployeePhoto(value) {
+    const photo = String(value || "").trim();
+    if (!photo) return "";
+    return photo.startsWith("data:image/") || /^https?:\/\//i.test(photo) ? photo : "";
 }
 
 function isKitchenCategory(category) {
@@ -619,6 +660,7 @@ function logout() {
 
 function render() {
     if (!currentUser) {
+        closeEmployeeInfo();
         dom.loginView.hidden = false;
         dom.appView.hidden = true;
         dom.logoutBtn.hidden = true;
@@ -955,6 +997,7 @@ function renderActiveView() {
 
 function setActiveView(view) {
     closeShiftPopover();
+    closeEmployeeInfo();
     if (currentUser.type === "employee") {
         activeView = "employeeAvailability";
     } else {
@@ -1655,10 +1698,10 @@ function renderScheduleMatrix() {
         return [
             `<div class="schedule-matrix-group">${escapeHtml(group.label)}</div>`,
             ...group.employees.flatMap((employee) => [
-                `<div class="schedule-matrix-name">
+                `<button class="schedule-matrix-name employee-name-trigger" type="button" data-action="view-employee" data-id="${escapeHtml(employee.id)}" aria-label="Open profile for ${escapeHtml(employee.name)}">
                     <strong>${escapeHtml(employee.name)}</strong>
                     <span>${escapeHtml(employee.role || employeeCategoryLabel(employee))}</span>
-                </div>`,
+                </button>`,
                 ...days.map((date) => renderScheduleMatrixCell(employee, formatDate(date)))
             ])
         ];
@@ -1709,10 +1752,10 @@ function renderWeekBuilder() {
         return [
             `<div class="week-builder-group">${escapeHtml(group.label)}</div>`,
             ...group.employees.flatMap((employee) => [
-                `<div class="week-builder-employee">
+                `<button class="week-builder-employee employee-name-trigger" type="button" data-action="view-employee" data-id="${escapeHtml(employee.id)}" aria-label="Open profile for ${escapeHtml(employee.name)}">
                     <strong>${escapeHtml(employee.name)}</strong>
                     <span>${escapeHtml(formatHours(getWeekMinutesForEmployee(employee.id, week)))}</span>
-                </div>`,
+                </button>`,
                 ...week.map((date) => renderWeekBuilderCell(employee, date))
             ])
         ];
@@ -1990,7 +2033,7 @@ function renderManagerDayAvailability() {
                     return `
                         <div class="availability-line">
                             <div>
-                                <div class="availability-name">${escapeHtml(employee.name)}</div>
+                                <button class="availability-name employee-name-trigger" type="button" data-action="view-employee" data-id="${escapeHtml(employee.id)}" aria-label="Open profile for ${escapeHtml(employee.name)}">${escapeHtml(employee.name)}</button>
                                 <div class="availability-detail">${escapeHtml(detail)}</div>
                             </div>
                             ${availability ? `<b class="dot ${status}"></b>` : `<b class="dot"></b>`}
@@ -2115,7 +2158,7 @@ function renderAvailabilityMatrix() {
         return [
             `<div class="matrix-group-row">${escapeHtml(group.label)}</div>`,
             ...group.employees.flatMap((employee) => [
-                `<div class="matrix-employee">${escapeHtml(employee.name)}</div>`,
+                `<button class="matrix-employee employee-name-trigger" type="button" data-action="view-employee" data-id="${escapeHtml(employee.id)}" aria-label="Open profile for ${escapeHtml(employee.name)}">${escapeHtml(employee.name)}</button>`,
                 ...days.map((date) => renderAvailabilityMatrixCell(employee, formatDate(date)))
             ])
         ];
@@ -2223,7 +2266,7 @@ function renderAvailabilityBuilderPerson(employee) {
     return `
         <label class="builder-person ${status} ${selected ? "selected" : ""} ${selectable ? "" : "disabled"}">
             <input type="checkbox" value="${escapeHtml(employee.id)}" data-builder-checkbox ${selected ? "checked" : ""} ${selectable ? "" : "disabled"}>
-            <span class="employee-color" style="background:${safeAccentColor(employee.color)}"></span>
+            ${renderEmployeeAvatar(employee, "employee-picker-photo")}
             <span class="builder-person-main">
                 <strong>${escapeHtml(employee.name)}</strong>
                 <small>${escapeHtml(employee.role || employeeCategoryLabel(employee))}</small>
@@ -2292,14 +2335,15 @@ function renderEmployees() {
                         const canMoveDown = index < group.employees.length - 1;
                         return `
                             <div class="employee-row">
-                                <div class="employee-meta">
-                                    <span class="employee-color" style="background:${employee.color}"></span>
+                                <button class="employee-profile-trigger" type="button" data-action="view-employee" data-id="${escapeHtml(employee.id)}" aria-label="Open profile for ${escapeHtml(employee.name)}">
+                                    ${renderEmployeeAvatar(employee, "employee-photo")}
                                     <div>
                                         <p class="employee-name">${escapeHtml(employee.name)}</p>
                                         <p class="employee-sub">${escapeHtml(employee.role || employeeCategoryLabel(employee))}</p>
                                         <p class="employee-hours">${formatHours(minutes)} this month, ${shifts} ${shifts === 1 ? "shift" : "shifts"}</p>
+                                        <p class="employee-contact-preview">${escapeHtml(getEmployeeContactSummary(employee))}</p>
                                     </div>
-                                </div>
+                                </button>
                                 <div class="employee-actions">
                                     <div class="employee-reorder" aria-label="Reorder ${escapeHtml(employee.name)}">
                                         <button class="icon-button reorder-button" type="button" data-action="move-employee" data-direction="-1" data-id="${employee.id}" aria-label="Move ${escapeHtml(employee.name)} up" title="Move up" ${canMoveUp ? "" : "disabled"}>
@@ -2332,6 +2376,12 @@ function handleCalendarClick(event) {
 }
 
 function handleManagerAvailabilityClick(event) {
+    const profileButton = event.target.closest("[data-action='view-employee']");
+    if (profileButton) {
+        openEmployeeInfo(profileButton.dataset.id);
+        return;
+    }
+
     const quickAddButton = event.target.closest("[data-action='quick-add-shift']");
     if (quickAddButton) {
         quickAddAvailabilityShift(quickAddButton.dataset.employeeId, quickAddButton.dataset.date);
@@ -2372,6 +2422,12 @@ function handleManagerAvailabilityClick(event) {
 }
 
 function handleScheduleMatrixClick(event) {
+    const profileButton = event.target.closest("[data-action='view-employee']");
+    if (profileButton) {
+        openEmployeeInfo(profileButton.dataset.id);
+        return;
+    }
+
     const weekButton = event.target.closest("[data-action='change-schedule-week']");
     if (weekButton) {
         changeWeek(Number(weekButton.dataset.delta));
@@ -2571,7 +2627,9 @@ function handleDocumentClick(event) {
 }
 
 function handleGlobalKeydown(event) {
-    if (event.key === "Escape") closeShiftPopover();
+    if (event.key !== "Escape") return;
+    closeShiftPopover();
+    closeEmployeeInfo();
 }
 
 function removeEmployeeShiftsOnDate(employeeId, dateKey) {
@@ -2765,11 +2823,14 @@ function clearAvailability() {
     renderEmployeeAvailability();
 }
 
-function handleEmployeeSubmit(event) {
+async function handleEmployeeSubmit(event) {
     event.preventDefault();
     const manager = getCurrentManagerConfig();
     const name = dom.employeeName.value.trim();
     const role = dom.employeeRole.value.trim();
+    const email = cleanEmployeeText(dom.employeeEmail.value);
+    const phone = cleanEmployeeText(dom.employeePhone.value);
+    const notes = cleanEmployeeText(dom.employeeNotes.value);
     const code = normalizeCode(dom.employeeCode.value || generateEmployeeCode(name));
     const area = manager.area;
     const category = area === "boh" && isKitchenCategory(dom.employeeCategory.value)
@@ -2782,10 +2843,22 @@ function handleEmployeeSubmit(event) {
         return;
     }
 
+    let photo = "";
+    try {
+        photo = await readEmployeePhotoInput(dom.employeePhoto);
+    } catch (error) {
+        dom.employeeFormMessage.textContent = error.message;
+        return;
+    }
+
     const employee = {
         id: `emp-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         name,
         role,
+        photo,
+        email,
+        phone,
+        notes,
         code,
         color: employeeColors[state.employees.length % employeeColors.length],
         area,
@@ -2812,8 +2885,13 @@ function handleEmployeeListClick(event) {
     }
 
     const removeButton = event.target.closest("[data-action='remove-employee']");
-    if (!removeButton) return;
-    removeEmployee(removeButton.dataset.id);
+    if (removeButton) {
+        removeEmployee(removeButton.dataset.id);
+        return;
+    }
+
+    const profileButton = event.target.closest("[data-action='view-employee']");
+    if (profileButton) openEmployeeInfo(profileButton.dataset.id);
 }
 
 function handleEmployeeListChange(event) {
@@ -2829,6 +2907,82 @@ function handleEmployeeListChange(event) {
     normalizeEmployeeOrders(state.employees, "boh");
     saveState();
     renderEmployees();
+}
+
+function canOpenEmployeeProfile(employee) {
+    if (!employee || !currentUser) return false;
+    if (currentUser.type === "manager") return getEmployeeArea(employee) === getCurrentManagerArea();
+    return currentUser.type === "employee" && currentUser.employeeId === employee.id;
+}
+
+function openEmployeeInfo(employeeId) {
+    const employee = getEmployee(employeeId);
+    if (!canOpenEmployeeProfile(employee)) return;
+    closeShiftPopover();
+    activeEmployeeProfileId = employee.id;
+    renderEmployeeInfo(employee);
+    dom.employeeInfoOverlay.hidden = false;
+    requestAnimationFrame(() => dom.closeEmployeeInfoBtn.focus());
+    refreshIcons();
+}
+
+function renderEmployeeInfo(employee) {
+    const minutes = getEmployeeMonthlyMinutes(employee.id, currentMonth);
+    const shifts = getEmployeeMonthlyShiftCount(employee.id, currentMonth);
+    dom.employeeInfoPhoto.innerHTML = renderEmployeeAvatar(employee, "employee-info-avatar-image");
+    dom.employeeInfoName.textContent = employee.name;
+    dom.employeeInfoRole.textContent = employee.role || employeeCategoryLabel(employee);
+    dom.employeeInfoMeta.textContent = `${employeeCategoryLabel(employee)} - ${formatHours(minutes)} this month, ${shifts} ${shifts === 1 ? "shift" : "shifts"}`;
+    dom.employeeInfoCode.textContent = employee.code || "";
+    dom.employeeInfoEmailInput.value = employee.email || "";
+    dom.employeeInfoPhoneInput.value = employee.phone || "";
+    dom.employeeInfoNotes.value = employee.notes || "";
+    dom.employeeInfoPhotoInput.value = "";
+    dom.employeeInfoRemovePhotoBtn.hidden = !employee.photo;
+    dom.employeeInfoMessage.textContent = "";
+}
+
+async function handleEmployeeInfoSubmit(event) {
+    event.preventDefault();
+    const employee = getEmployee(activeEmployeeProfileId);
+    if (!employee || !canOpenEmployeeProfile(employee)) {
+        closeEmployeeInfo();
+        return;
+    }
+
+    try {
+        const photo = await readEmployeePhotoInput(dom.employeeInfoPhotoInput);
+        if (photo) employee.photo = photo;
+    } catch (error) {
+        dom.employeeInfoMessage.textContent = error.message;
+        return;
+    }
+
+    employee.email = cleanEmployeeText(dom.employeeInfoEmailInput.value);
+    employee.phone = cleanEmployeeText(dom.employeeInfoPhoneInput.value);
+    employee.notes = cleanEmployeeText(dom.employeeInfoNotes.value);
+    saveState();
+    renderActiveView();
+    renderEmployeeInfo(employee);
+    dom.employeeInfoMessage.textContent = "Profile saved.";
+}
+
+function removeEmployeeInfoPhoto() {
+    const employee = getEmployee(activeEmployeeProfileId);
+    if (!employee || !canOpenEmployeeProfile(employee)) return;
+    employee.photo = "";
+    saveState();
+    renderActiveView();
+    renderEmployeeInfo(employee);
+    dom.employeeInfoMessage.textContent = "Photo removed.";
+}
+
+function closeEmployeeInfo() {
+    if (!dom.employeeInfoOverlay) return;
+    dom.employeeInfoOverlay.hidden = true;
+    activeEmployeeProfileId = null;
+    if (dom.employeeInfoForm) dom.employeeInfoForm.reset();
+    if (dom.employeeInfoMessage) dom.employeeInfoMessage.textContent = "";
 }
 
 function moveEmployee(employeeId, direction) {
@@ -2856,6 +3010,7 @@ function moveEmployee(employeeId, direction) {
 function removeEmployee(employeeId) {
     const employee = getEmployee(employeeId);
     const area = employee ? getEmployeeArea(employee) : getCurrentManagerArea();
+    if (activeEmployeeProfileId === employeeId) closeEmployeeInfo();
     state.employees = state.employees.filter((employee) => employee.id !== employeeId);
     delete state.availability[employeeId];
     Object.keys(state.shifts).forEach((dateKey) => {
@@ -2881,6 +3036,12 @@ function removeEmployee(employeeId) {
 }
 
 function handleWeekBuilderClick(event) {
+    const profileButton = event.target.closest("[data-action='view-employee']");
+    if (profileButton) {
+        openEmployeeInfo(profileButton.dataset.id);
+        return;
+    }
+
     const button = event.target.closest("[data-date]");
     if (!button) return;
     setSelectedDate(parseDate(button.dataset.date));
@@ -3750,6 +3911,74 @@ function generateEmployeeCode(name) {
 
 function getInitials(name) {
     return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+}
+
+function renderEmployeeAvatar(employee, className = "employee-photo") {
+    const name = employee && employee.name ? employee.name : "Employee";
+    const photo = normalizeEmployeePhoto(employee && employee.photo);
+    if (photo) {
+        return `
+            <span class="${className} has-photo">
+                <img src="${escapeHtml(photo)}" alt="${escapeHtml(name)} photo" loading="lazy">
+            </span>
+        `;
+    }
+
+    return `<span class="${className} fallback" style="background:${safeAccentColor(employee && employee.color)}">${escapeHtml(getInitials(name) || "?")}</span>`;
+}
+
+function getEmployeeContactSummary(employee) {
+    const labels = [];
+    if (employee.photo) labels.push("Photo");
+    if (employee.email) labels.push("Email");
+    if (employee.phone) labels.push("Phone");
+    if (employee.notes) labels.push("Notes");
+    return labels.length ? `${labels.join(" + ")} saved` : "Open profile to add contact info";
+}
+
+async function readEmployeePhotoInput(input) {
+    const file = input && input.files ? input.files[0] : null;
+    if (!file) return "";
+    if (!file.type || !file.type.startsWith("image/")) {
+        throw new Error("Choose an image file for the photo.");
+    }
+    if (file.size > 8 * 1024 * 1024) {
+        throw new Error("Choose a photo smaller than 8 MB.");
+    }
+    return resizeEmployeePhoto(file);
+}
+
+function resizeEmployeePhoto(file) {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        const imageUrl = URL.createObjectURL(file);
+        image.onload = () => {
+            try {
+                const naturalWidth = image.naturalWidth || image.width;
+                const naturalHeight = image.naturalHeight || image.height;
+                const sourceSize = Math.min(naturalWidth, naturalHeight);
+                const sourceX = Math.max(0, (naturalWidth - sourceSize) / 2);
+                const sourceY = Math.max(0, (naturalHeight - sourceSize) / 2);
+                const canvas = document.createElement("canvas");
+                const size = 320;
+                canvas.width = size;
+                canvas.height = size;
+                const context = canvas.getContext("2d");
+                if (!context) throw new Error("Photo could not be prepared.");
+                context.drawImage(image, sourceX, sourceY, sourceSize, sourceSize, 0, 0, size, size);
+                URL.revokeObjectURL(imageUrl);
+                resolve(canvas.toDataURL("image/jpeg", 0.84));
+            } catch (error) {
+                URL.revokeObjectURL(imageUrl);
+                reject(new Error("Photo could not be prepared."));
+            }
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(imageUrl);
+            reject(new Error("Photo could not be opened."));
+        };
+        image.src = imageUrl;
+    });
 }
 
 function statusLabel(status) {
