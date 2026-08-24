@@ -2329,17 +2329,23 @@ function positionShiftPopover(anchor) {
     const popoverRect = dom.shiftPopover.getBoundingClientRect();
     const gap = 8;
     const margin = 12;
-    const viewport = window.visualViewport;
-    const viewportLeft = viewport ? viewport.offsetLeft : 0;
-    const viewportTop = viewport ? viewport.offsetTop : 0;
-    const viewportWidth = viewport ? viewport.width : window.innerWidth;
-    const viewportHeight = viewport ? viewport.height : window.innerHeight;
-    const minLeft = viewportLeft + margin;
-    const maxLeft = Math.max(minLeft, viewportLeft + viewportWidth - popoverRect.width - margin);
-    const minTop = viewportTop + margin;
-    const maxTop = Math.max(minTop, viewportTop + viewportHeight - popoverRect.height - margin);
-    let left = anchorRect.left + (anchorRect.width / 2) - (popoverRect.width / 2);
+    const viewportBounds = getViewportBounds();
+    const minLeft = viewportBounds.left + margin;
+    const maxLeft = Math.max(minLeft, viewportBounds.right - popoverRect.width - margin);
+    const minTop = viewportBounds.top + margin;
+    const maxTop = Math.max(minTop, viewportBounds.bottom - popoverRect.height - margin);
+    const fitsRight = anchorRect.right + gap + popoverRect.width <= viewportBounds.right - margin;
+    const fitsLeft = anchorRect.left - gap - popoverRect.width >= viewportBounds.left + margin;
+    let left;
     let top = anchorRect.bottom + gap;
+
+    if (fitsRight && !fitsLeft) {
+        left = anchorRect.right + gap;
+    } else if (fitsLeft && !fitsRight) {
+        left = anchorRect.left - popoverRect.width - gap;
+    } else {
+        left = anchorRect.left + (anchorRect.width / 2) - (popoverRect.width / 2);
+    }
 
     left = Math.min(Math.max(left, minLeft), maxLeft);
     if (top > maxTop) {
@@ -2349,6 +2355,31 @@ function positionShiftPopover(anchor) {
 
     dom.shiftPopover.style.left = `${left}px`;
     dom.shiftPopover.style.top = `${top}px`;
+}
+
+function getViewportBounds() {
+    const viewport = window.visualViewport;
+    const widthCandidates = [
+        window.innerWidth,
+        document.documentElement.clientWidth,
+        viewport ? viewport.width : null
+    ].filter((value) => Number.isFinite(value) && value > 0);
+    const heightCandidates = [
+        window.innerHeight,
+        document.documentElement.clientHeight,
+        viewport ? viewport.height : null
+    ].filter((value) => Number.isFinite(value) && value > 0);
+    const width = Math.min(...widthCandidates);
+    const height = Math.min(...heightCandidates);
+    const left = viewport ? viewport.offsetLeft : 0;
+    const top = viewport ? viewport.offsetTop : 0;
+
+    return {
+        left,
+        top,
+        right: left + width,
+        bottom: top + height
+    };
 }
 
 function closeShiftPopover() {
