@@ -1943,6 +1943,10 @@ body.manager-schedule-view #nextMonthBtn {
     margin-bottom: 1rem;
 }
 
+#employeeDayShifts {
+    margin-top: 0.85rem;
+}
+
 .availability-group,
 .employee-group {
     display: grid;
