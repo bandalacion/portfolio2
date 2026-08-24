@@ -1635,13 +1635,7 @@ function renderAvailabilityMatrix() {
             `<div class="matrix-group-row">${escapeHtml(group.label)}</div>`,
             ...group.employees.flatMap((employee) => [
                 `<div class="matrix-employee">${escapeHtml(employee.name)}</div>`,
-                ...days.map((date) => {
-                    const dateKey = formatDate(date);
-                    const availability = getAvailability(employee.id, dateKey);
-                    const label = availability ? statusShort(availability.status) : "";
-                    const title = availability ? `${employee.name}: ${statusLabel(availability.status)}` : `${employee.name}: no entry`;
-                    return `<div class="matrix-cell ${availability ? availability.status : ""} ${dateKey === selectedDate ? "selected-column" : ""}" title="${escapeHtml(title)}">${label}</div>`;
-                })
+                ...days.map((date) => renderAvailabilityMatrixCell(employee, formatDate(date)))
             ])
         ];
     });
@@ -1651,6 +1645,36 @@ function renderAvailabilityMatrix() {
         : `<p class="empty-state">No employees have been added yet.</p>`;
     renderAvailabilityBuilder();
     requestAnimationFrame(updateAvailabilityScrollControls);
+}
+
+function renderAvailabilityMatrixCell(employee, dateKey) {
+    const availability = getAvailability(employee.id, dateKey);
+    const scheduledShifts = getEmployeeShiftsForDate(employee.id, dateKey);
+    const scheduled = scheduledShifts.length > 0;
+    const canQuickAdd = availability && availability.status === "available" && !scheduled;
+    const classes = [
+        "matrix-cell",
+        canQuickAdd ? "matrix-cell-button" : "",
+        availability ? availability.status : "",
+        scheduled ? "scheduled" : "",
+        dateKey === selectedDate ? "selected-column" : ""
+    ].filter(Boolean).join(" ");
+    const title = scheduled
+        ? `${employee.name}: scheduled ${scheduledShifts.map((shift) => `${shift.start}-${shift.end}`).join(", ")}`
+        : availability
+            ? `${employee.name}: ${statusLabel(availability.status)}${canQuickAdd ? " - click to add shift" : ""}`
+            : `${employee.name}: no entry`;
+    const label = scheduled ? "S" : (availability ? statusShort(availability.status) : "");
+
+    if (!canQuickAdd) {
+        return `<div class="${classes}" title="${escapeHtml(title)}">${escapeHtml(label)}</div>`;
+    }
+
+    return `
+        <button class="${classes}" type="button" data-action="quick-add-shift" data-employee-id="${escapeHtml(employee.id)}" data-date="${escapeHtml(dateKey)}" title="${escapeHtml(title)}" aria-label="Add shift for ${escapeHtml(employee.name)} on ${escapeHtml(longDate(dateKey))}">
+            ${escapeHtml(label)}
+        </button>
+    `;
 }
 
 function renderAvailabilityBuilder() {
@@ -1747,6 +1771,16 @@ function canSelectAvailabilityBuilderEmployee(employee) {
     return !hasEmployeeShiftOnDate(employee.id, selectedDate) && (!availability || availability.status !== "unavailable");
 }
 
+function canQuickAddAvailabilityShift(employee, dateKey) {
+    const availability = getAvailability(employee.id, dateKey);
+    return Boolean(
+        employee
+        && availability
+        && availability.status === "available"
+        && !hasEmployeeShiftOnDate(employee.id, dateKey)
+    );
+}
+
 function formatAvailabilityDetail(availability) {
     if (!availability) return "No availability added";
     const time = availability.start && availability.end ? `${availability.start}-${availability.end}` : "";
@@ -1817,6 +1851,12 @@ function handleCalendarClick(event) {
 }
 
 function handleManagerAvailabilityClick(event) {
+    const quickAddButton = event.target.closest("[data-action='quick-add-shift']");
+    if (quickAddButton) {
+        quickAddAvailabilityShift(quickAddButton.dataset.employeeId, quickAddButton.dataset.date);
+        return;
+    }
+
     const dateButton = event.target.closest("[data-action='select-availability-date']");
     if (dateButton) {
         setSelectedDate(parseDate(dateButton.dataset.date));
@@ -1848,6 +1888,39 @@ function handleManagerAvailabilityClick(event) {
         dom.availabilityBuilderMessage.textContent = "";
         renderAvailabilityBuilder();
     }
+}
+
+function quickAddAvailabilityShift(employeeId, dateKey) {
+    const employee = getEmployee(employeeId);
+    const manager = getCurrentManagerConfig();
+    if (!employee || getEmployeeArea(employee) !== manager.area) return;
+
+    selectedDate = dateKey;
+    currentMonth = startOfMonth(parseDate(dateKey));
+    availabilityBuilderSelectedIds.clear();
+    renderMonthLabel();
+
+    if (!canQuickAddAvailabilityShift(employee, dateKey)) {
+        dom.availabilityBuilderMessage.textContent = hasEmployeeShiftOnDate(employee.id, dateKey)
+            ? `${employee.name} already has a shift on ${longDate(dateKey)}.`
+            : `${employee.name} is not marked available on ${longDate(dateKey)}.`;
+        renderAvailabilityMatrix();
+        return;
+    }
+
+    const shift = createShift({
+        employeeId: employee.id,
+        start: dom.builderShiftStart.value || "09:00",
+        end: dom.builderShiftEnd.value || "17:00",
+        role: dom.builderShiftRole.value.trim(),
+        note: dom.builderShiftNote.value.trim(),
+        privateNote: dom.builderShiftPrivateNote.value.trim()
+    });
+
+    state.shifts[dateKey] = [...(state.shifts[dateKey] || []), shift];
+    saveState();
+    renderAvailabilityMatrix();
+    dom.availabilityBuilderMessage.textContent = `Added ${employee.name} on ${longDate(dateKey)} from ${shift.start} to ${shift.end}.`;
 }
 
 function handleAvailabilityBuilderSelectionChange(event) {
