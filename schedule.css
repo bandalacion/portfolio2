@@ -1130,8 +1130,8 @@ select:focus {
 .schedule-check-cell {
     display: grid;
     place-items: center;
-    gap: 0.12rem;
-    padding: 0.32rem;
+    gap: 0.18rem;
+    padding: 0.46rem 0.4rem;
     border: 1px solid var(--line);
     background: rgba(255, 255, 255, 0.68);
     color: var(--muted);
@@ -1565,13 +1565,15 @@ select:focus {
 
 .availability-dots {
     display: inline-flex;
-    gap: 0.25rem;
+    gap: 0.38rem;
+    padding-inline: 0.12rem;
 }
 
 .dot {
     display: inline-block;
-    width: 8px;
-    height: 8px;
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background: var(--muted-2);
 }
@@ -2209,7 +2211,7 @@ select:focus {
 
 .legend {
     flex-wrap: wrap;
-    gap: 0.8rem;
+    gap: 0.55rem;
     color: var(--muted);
     font-size: 0.82rem;
     font-weight: 700;
@@ -2218,7 +2220,12 @@ select:focus {
 .legend span {
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.5rem;
+    min-height: 28px;
+    padding: 0.25rem 0.48rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.58);
 }
 
 .availability-matrix-wrap {
@@ -2284,6 +2291,8 @@ select:focus {
 
 .matrix-cell {
     justify-content: center;
+    min-width: 32px;
+    padding: 0.18rem 0.24rem;
     border: 1px solid var(--line);
     background: rgba(255, 255, 255, 0.55);
     color: white;
