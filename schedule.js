@@ -1421,9 +1421,9 @@ function renderScheduleMatrix() {
     const days = getMonthDates(currentMonth);
     const manager = getCurrentManagerConfig();
     const employees = getManagerEmployees();
-    const daySize = document.body.classList.contains("pdf-exporting") ? 42 : 54;
-    const nameSize = document.body.classList.contains("pdf-exporting") ? 126 : 180;
-    dom.scheduleMatrix.style.gridTemplateColumns = `${nameSize}px repeat(${days.length}, ${daySize}px)`;
+    const nameColumn = document.body.classList.contains("pdf-exporting") ? "126px" : "minmax(112px, 1.2fr)";
+    const dayColumn = document.body.classList.contains("pdf-exporting") ? "42px" : "minmax(22px, 1fr)";
+    dom.scheduleMatrix.style.gridTemplateColumns = `${nameColumn} repeat(${days.length}, ${dayColumn})`;
 
     if (!employees.length) {
         dom.scheduleMatrix.innerHTML = `<p class="empty-state">Add employees before building the schedule.</p>`;
@@ -1472,8 +1472,8 @@ function renderScheduleMatrixCell(employee, dateKey) {
         : availability
             ? `${employee.name}: ${formatAvailabilityDetail(availability)}`
             : `${employee.name}: no availability entered`;
-    const timeHint = availability && availability.start && availability.end ? `${availability.start}-${availability.end}` : "";
-    const label = scheduled ? `${shift.start}-${shift.end}` : (statusShort(status) || "-");
+    const timeHint = availability && availability.start && availability.end ? formatCompactTimeRange(availability.start, availability.end) : "";
+    const label = scheduled ? formatCompactTimeRange(shift.start, shift.end) : (statusShort(status) || "-");
 
     return `
         <button class="schedule-check-cell ${status} ${conflict ? "conflict" : ""} ${disabled ? "disabled" : ""}" type="button" data-action="edit-schedule-cell" data-employee-id="${escapeHtml(employee.id)}" data-date="${escapeHtml(dateKey)}" title="${escapeHtml(title)}" aria-pressed="${scheduled ? "true" : "false"}" aria-label="${escapeHtml(title)}" ${disabled ? "disabled" : ""}>
@@ -3345,6 +3345,18 @@ function formatHours(minutes) {
     const hours = minutes / 60;
     if (Number.isInteger(hours)) return `${hours}h`;
     return `${hours.toFixed(1).replace(/\.0$/, "")}h`;
+}
+
+function formatCompactTimeRange(start, end) {
+    return `${formatCompactTime(start)}-${formatCompactTime(end)}`;
+}
+
+function formatCompactTime(value) {
+    const minutes = timeToMinutes(value);
+    if (minutes === null) return value || "";
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return remainder ? `${hours}:${String(remainder).padStart(2, "0")}` : String(hours);
 }
 
 function getCalendarCells(monthDate) {
