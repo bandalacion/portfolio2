@@ -11,17 +11,20 @@ const LOADER_COMPLETE_HOLD_MS = 220;
 
 const managerAreas = {
     foh: {
-        code: "FOH2026",
         label: "Front of House",
         shortLabel: "FOH",
+        managerName: "Chrism",
+        managerInitials: "C",
+        loginNames: ["Chrism", "Chris M", "Chris Manager"],
         title: "Front of House Schedule",
         role: "Front of House manager"
     },
     boh: {
-        code: "BOH2026",
-        legacyCodes: ["MANAGER2026"],
         label: "Back of House",
         shortLabel: "BOH",
+        managerName: "Sander",
+        managerInitials: "S",
+        loginNames: ["Sander"],
         title: "Back of House Schedule",
         role: "Kitchen manager"
     }
@@ -53,11 +56,6 @@ const defaultShiftTemplates = [
 ];
 
 const stateTemplate = () => ({
-    managerCode: "MANAGER2026",
-    managerCodes: {
-        foh: managerAreas.foh.code,
-        boh: managerAreas.boh.code
-    },
     employees: [
         { id: "emp-alex", name: "Alex Morgan", role: "Chef", code: "ALEX101", color: "#007aff", area: "boh", category: "fulltime", order: 0 },
         { id: "emp-mia", name: "Mia Chen", role: "Part-time cook", code: "MIA204", color: "#34c759", area: "boh", category: "parttime-cook", order: 0 },
@@ -328,10 +326,6 @@ function normalizeState(nextState) {
     const normalizedState = {
         ...template,
         ...(nextState || {}),
-        managerCodes: {
-            ...template.managerCodes,
-            ...((nextState && nextState.managerCodes) || {})
-        },
         employees: Array.isArray(nextState && nextState.employees)
             ? nextState.employees.map(normalizeEmployee)
             : template.employees.map(normalizeEmployee),
@@ -344,6 +338,8 @@ function normalizeState(nextState) {
         confirmations: nextState && nextState.confirmations ? nextState.confirmations : {},
         swapRequests: normalizeSwapRequests(nextState && nextState.swapRequests)
     };
+    delete normalizedState.managerCode;
+    delete normalizedState.managerCodes;
     normalizeEmployeeOrders(normalizedState.employees);
     return normalizedState;
 }
@@ -454,12 +450,22 @@ function saveSession() {
 }
 
 function getManagerByCode(code) {
-    return Object.entries(managerAreas).map(([area, config]) => {
-        const configuredCode = state.managerCodes && state.managerCodes[area] ? state.managerCodes[area] : config.code;
-        const validCodes = [configuredCode, config.code, ...(config.legacyCodes || [])];
-        if (area === "boh") validCodes.push(state.managerCode);
-        return validCodes.some((item) => normalizeCode(item) === code) ? { area, ...config } : null;
-    }).find(Boolean);
+    return Object.entries(managerAreas)
+        .map(([area, config]) => getPersonalManagerCodes(area, config)
+            .some((item) => normalizeCode(item) === code) ? { area, ...config } : null)
+        .find(Boolean);
+}
+
+function getPersonalManagerCodes(area, config = managerAreas[area]) {
+    const loginNameCodes = (config.loginNames || []).map(normalizeCode);
+    const employeeCodes = state.employees
+        .filter((employee) => getEmployeeArea(employee) === area)
+        .filter((employee) => {
+            const employeeName = normalizeCode(employee.name);
+            return loginNameCodes.some((nameCode) => employeeName === nameCode || employeeName.startsWith(nameCode));
+        })
+        .map((employee) => employee.code);
+    return [...employeeCodes, ...loginNameCodes];
 }
 
 function isManagerCode(code) {
@@ -870,11 +876,11 @@ function hideLoadingScreen() {
 function updateSessionUi() {
     if (currentUser.type === "manager") {
         const manager = getCurrentManagerConfig();
-        dom.profileAvatar.textContent = manager.shortLabel;
+        dom.profileAvatar.textContent = manager.managerInitials || manager.shortLabel;
         dom.profileAvatar.style.background = "#1d1d1f";
-        dom.profileName.textContent = manager.label;
+        dom.profileName.textContent = manager.managerName || manager.label;
         dom.profileRole.textContent = manager.role;
-        dom.sessionPill.textContent = manager.shortLabel;
+        dom.sessionPill.textContent = manager.managerName || manager.shortLabel;
         return;
     }
 

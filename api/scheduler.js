@@ -4,7 +4,6 @@ const STATE_ID = process.env.SCHEDULER_STATE_ID || "main";
 const STATE_PATH = `scheduler/${STATE_ID}.json`;
 
 const defaultState = {
-    managerCode: "MANAGER2026",
     employees: [
         { id: "emp-alex", name: "Alex Morgan", role: "Front desk", code: "ALEX101", color: "#007aff" },
         { id: "emp-mia", name: "Mia Chen", role: "Service", code: "MIA204", color: "#34c759" },
@@ -91,13 +90,16 @@ async function readSchedulerState(get) {
 }
 
 function normalizeState(nextState) {
-    return {
+    const normalizedState = {
         ...defaultState,
         ...(nextState || {}),
         employees: Array.isArray(nextState && nextState.employees) ? nextState.employees : defaultState.employees,
         availability: nextState && nextState.availability ? nextState.availability : {},
         shifts: nextState && nextState.shifts ? nextState.shifts : {}
     };
+    delete normalizedState.managerCode;
+    delete normalizedState.managerCodes;
+    return normalizedState;
 }
 
 async function streamToText(stream) {
