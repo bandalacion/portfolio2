@@ -722,17 +722,14 @@ function startPremiumLoader(startupPromise) {
     const minDuration = prefersReducedMotion ? 600 : (hasSeenLoader ? REPEAT_LOADING_MS : MIN_LOADING_MS);
     const maxDuration = prefersReducedMotion ? 2200 : MAX_LOADING_MS;
     const startedAt = performance.now();
-    const logoPieces = Array.from(dom.loadingScreen.querySelectorAll(".loader-logo-piece"));
-    const finalLogo = dom.loadingScreen.querySelector(".loader-logo-final");
+    const logoPieces = Array.from(dom.loadingScreen.querySelectorAll(".loader-word-piece"));
+    const finalLogo = dom.loadingScreen.querySelector(".loader-word-final");
     const pieceMotion = [
-        { x: -36, y: -18, r: -9, s: 0.08, delay: 0 },
-        { x: 30, y: -24, r: 8, s: -0.04, delay: 0.04 },
-        { x: -26, y: 8, r: 6, s: 0.05, delay: 0.08 },
-        { x: 34, y: 10, r: -7, s: 0.04, delay: 0.02 },
-        { x: -22, y: 28, r: -5, s: -0.05, delay: 0.1 },
-        { x: 26, y: 25, r: 6, s: 0.06, delay: 0.06 },
-        { x: -16, y: 38, r: 5, s: 0.03, delay: 0.14 },
-        { x: 22, y: 36, r: -6, s: -0.03, delay: 0.12 }
+        { x: -48, y: 16, r: -11, s: 0.1, delay: 0 },
+        { x: -20, y: -28, r: 7, s: -0.06, delay: 0.04 },
+        { x: 12, y: 30, r: -8, s: 0.06, delay: 0.08 },
+        { x: 36, y: -22, r: 9, s: -0.05, delay: 0.1 },
+        { x: 54, y: 12, r: -10, s: 0.07, delay: 0.13 }
     ];
     let realReady = false;
     let finishStartedAt = null;
