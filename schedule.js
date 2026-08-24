@@ -3,6 +3,7 @@
 const STORAGE_KEY = "portfolio2-scheduler-v1";
 const SESSION_KEY = "portfolio2-scheduler-session";
 const SYNC_ENDPOINT = "/api/scheduler";
+const MIN_LOADING_MS = 850;
 
 const managerAreas = {
     foh: {
@@ -84,6 +85,8 @@ let availabilityBuilderSelectedIds = new Set();
 let copiedDayShifts = null;
 let copiedWeekShifts = null;
 let activeShiftEditor = null;
+let loadingDismissed = false;
+const loadingStartedAt = performance.now();
 
 const dom = {};
 
@@ -91,13 +94,15 @@ document.addEventListener("DOMContentLoaded", () => {
     captureDom();
     bindEvents();
     render();
-    hydrateRemoteState();
+    hydrateRemoteState().finally(hideLoadingScreen);
+    setTimeout(hideLoadingScreen, 3800);
 });
 
 function captureDom() {
     [
         "loginView",
         "appView",
+        "loadingScreen",
         "loginForm",
         "loginMessage",
         "accessCode",
@@ -682,6 +687,21 @@ function renderSyncStatus() {
     if (!dom.syncPill) return;
     dom.syncPill.textContent = syncStatus.label;
     dom.syncPill.className = `sync-pill ${syncStatus.type === "synced" ? "" : syncStatus.type}`;
+}
+
+function hideLoadingScreen() {
+    if (loadingDismissed) return;
+    loadingDismissed = true;
+
+    const elapsed = performance.now() - loadingStartedAt;
+    const delay = Math.max(0, MIN_LOADING_MS - elapsed);
+    setTimeout(() => {
+        document.body.classList.add("loading-done");
+        document.body.classList.remove("is-loading");
+        setTimeout(() => {
+            if (dom.loadingScreen) dom.loadingScreen.remove();
+        }, 500);
+    }, delay);
 }
 
 function updateSessionUi() {

@@ -9,7 +9,20 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="schedule.css">
 </head>
-<body>
+<body class="is-loading">
+<div class="loading-screen" id="loadingScreen" role="status" aria-live="polite" aria-label="Loading Oak34 schedule">
+    <div class="loading-card">
+        <div class="loading-mark" aria-hidden="true">
+            <span class="loading-ring"></span>
+            <span class="loading-logo oak-logo-mark"></span>
+        </div>
+        <div>
+            <p class="eyebrow">Oak34</p>
+            <strong>Kitchen Schedule</strong>
+        </div>
+        <div class="loading-bar" aria-hidden="true"><span></span></div>
+    </div>
+</div>
 <div class="app-shell">
     <header class="topbar">
         <a class="brand-link" href="index.html" aria-label="Back to Oak34 home">

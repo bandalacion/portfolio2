@@ -47,6 +47,145 @@ body::before {
     pointer-events: none;
 }
 
+.loading-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: grid;
+    place-items: center;
+    padding: 1.5rem;
+    background:
+        radial-gradient(circle at 50% 38%, rgba(157, 52, 72, 0.13), transparent 30%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(250, 244, 241, 0.96));
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.42s ease, visibility 0.42s ease;
+}
+
+body.loading-done .loading-screen {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+body.is-loading .app-shell {
+    opacity: 0;
+    transform: translateY(8px);
+}
+
+body.loading-done .app-shell,
+body:not(.is-loading) .app-shell {
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.38s ease, transform 0.38s ease;
+}
+
+.loading-card {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    width: min(100%, 280px);
+    padding: 1.4rem;
+    border: 1px solid rgba(157, 52, 72, 0.16);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.76);
+    box-shadow: 0 24px 70px rgba(20, 23, 31, 0.14);
+    text-align: center;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+}
+
+.loading-mark {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 92px;
+    height: 92px;
+}
+
+.loading-ring {
+    position: absolute;
+    inset: 0;
+    border: 2px solid rgba(157, 52, 72, 0.16);
+    border-top-color: var(--blue);
+    border-right-color: rgba(255, 149, 0, 0.58);
+    border-radius: 50%;
+    animation: oakLoaderSpin 1.25s linear infinite;
+}
+
+.loading-logo {
+    position: relative;
+    z-index: 1;
+    width: 68px;
+    height: 68px;
+    border-radius: 8px;
+    animation: oakLoaderLogo 1.8s ease-in-out infinite;
+}
+
+.loading-card strong {
+    display: block;
+    font-size: 1.05rem;
+    line-height: 1.1;
+}
+
+.loading-bar {
+    overflow: hidden;
+    width: 100%;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(157, 52, 72, 0.12);
+}
+
+.loading-bar span {
+    display: block;
+    width: 42%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, rgba(157, 52, 72, 0.2), var(--blue), rgba(255, 149, 0, 0.8));
+    animation: oakLoaderBar 1.2s ease-in-out infinite;
+}
+
+@keyframes oakLoaderSpin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes oakLoaderLogo {
+    0%,
+    100% {
+        transform: scale(0.96);
+        filter: drop-shadow(0 8px 16px rgba(157, 52, 72, 0.14));
+    }
+    50% {
+        transform: scale(1.04) rotate(-2deg);
+        filter: drop-shadow(0 14px 22px rgba(157, 52, 72, 0.22));
+    }
+}
+
+@keyframes oakLoaderBar {
+    0% {
+        transform: translateX(-110%);
+    }
+    100% {
+        transform: translateX(260%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loading-screen,
+    body.loading-done .app-shell,
+    body:not(.is-loading) .app-shell {
+        transition: none;
+    }
+
+    .loading-ring,
+    .loading-logo,
+    .loading-bar span {
+        animation: none;
+    }
+}
+
 button,
 input,
 select {
