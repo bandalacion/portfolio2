@@ -239,6 +239,75 @@
                         <div class="availability-matrix" id="availabilityMatrix"></div>
                     </div>
                 </div>
+                <div class="availability-builder">
+                    <div class="builder-head">
+                        <div>
+                            <p class="eyebrow">Build schedule</p>
+                            <h2 id="availabilityBuilderSelectedDate"></h2>
+                        </div>
+                        <div class="builder-day-controls" aria-label="Selected availability day controls">
+                            <button class="icon-button" id="builderPrevDayBtn" type="button" aria-label="Previous day" title="Previous day">
+                                <i data-lucide="chevron-left"></i>
+                            </button>
+                            <button class="secondary-button" id="builderTodayBtn" type="button">
+                                <i data-lucide="calendar"></i>
+                                <span>Today</span>
+                            </button>
+                            <button class="icon-button" id="builderNextDayBtn" type="button" aria-label="Next day" title="Next day">
+                                <i data-lucide="chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="builder-stats" id="availabilityBuilderStats"></div>
+                    <form class="availability-schedule-form" id="availabilityScheduleForm">
+                        <div class="builder-toolbar">
+                            <div class="filter-tabs" aria-label="Availability filters">
+                                <button class="filter-tab active" type="button" data-builder-filter="available">Available</button>
+                                <button class="filter-tab" type="button" data-builder-filter="flexible">Available + maybe</button>
+                                <button class="filter-tab" type="button" data-builder-filter="unscheduled">Not scheduled</button>
+                                <button class="filter-tab" type="button" data-builder-filter="all">All</button>
+                            </div>
+                            <div class="builder-actions">
+                                <button class="secondary-button" id="builderSelectShownBtn" type="button">
+                                    <i data-lucide="check-check"></i>
+                                    <span>Select shown</span>
+                                </button>
+                                <button class="secondary-button" id="builderClearSelectionBtn" type="button">
+                                    <i data-lucide="x"></i>
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-grid builder-shift-fields">
+                            <label class="field-group">
+                                <span>Role</span>
+                                <input id="builderShiftRole" type="text" placeholder="Shift role">
+                            </label>
+                            <label class="field-group">
+                                <span>Start</span>
+                                <input id="builderShiftStart" type="time" value="09:00" required>
+                            </label>
+                            <label class="field-group">
+                                <span>End</span>
+                                <input id="builderShiftEnd" type="time" value="17:00" required>
+                            </label>
+                            <label class="field-group">
+                                <span>Note</span>
+                                <input id="builderShiftNote" type="text" placeholder="Optional note">
+                            </label>
+                        </div>
+                        <div class="builder-selection-head">
+                            <strong id="builderSelectedCount">0 selected</strong>
+                            <span id="builderVisibleCount">0 shown</span>
+                        </div>
+                        <div class="builder-people" id="availabilityBuilderList"></div>
+                        <button class="primary-button" id="builderAddSelectedBtn" type="submit">
+                            <i data-lucide="calendar-plus"></i>
+                            <span>Add selected shifts</span>
+                        </button>
+                        <p class="form-message" id="availabilityBuilderMessage" role="alert"></p>
+                    </form>
+                </div>
             </div>
 
             <div class="employees-layout" id="employeesView" hidden>

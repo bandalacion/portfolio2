@@ -65,6 +65,8 @@ let remoteSyncAvailable = false;
 let remoteSaveTimer = null;
 let isApplyingRemoteState = false;
 let syncStatus = { label: "Local only", type: "local" };
+let availabilityBuilderFilter = "available";
+let availabilityBuilderSelectedIds = new Set();
 
 const dom = {};
 
@@ -131,6 +133,23 @@ function captureDom() {
         "availabilityMatrix",
         "availabilityScrollPrev",
         "availabilityScrollNext",
+        "availabilityBuilderSelectedDate",
+        "builderPrevDayBtn",
+        "builderTodayBtn",
+        "builderNextDayBtn",
+        "availabilityBuilderStats",
+        "availabilityScheduleForm",
+        "builderShiftRole",
+        "builderShiftStart",
+        "builderShiftEnd",
+        "builderShiftNote",
+        "builderSelectedCount",
+        "builderVisibleCount",
+        "availabilityBuilderList",
+        "builderSelectShownBtn",
+        "builderClearSelectionBtn",
+        "builderAddSelectedBtn",
+        "availabilityBuilderMessage",
         "employeeForm",
         "employeeName",
         "employeeRole",
@@ -159,6 +178,12 @@ function bindEvents() {
     dom.availabilityScrollPrev.addEventListener("click", () => scrollStrip(dom.availabilityMatrixWrap, -1));
     dom.availabilityScrollNext.addEventListener("click", () => scrollStrip(dom.availabilityMatrixWrap, 1));
     dom.availabilityMatrixWrap.addEventListener("scroll", updateAvailabilityScrollControls);
+    dom.builderPrevDayBtn.addEventListener("click", () => changeBuilderDay(-1));
+    dom.builderTodayBtn.addEventListener("click", jumpBuilderToToday);
+    dom.builderNextDayBtn.addEventListener("click", () => changeBuilderDay(1));
+    dom.managerAvailabilityView.addEventListener("click", handleManagerAvailabilityClick);
+    dom.availabilityBuilderList.addEventListener("change", handleAvailabilityBuilderSelectionChange);
+    dom.availabilityScheduleForm.addEventListener("submit", handleAvailabilityScheduleSubmit);
     dom.managerCalendarGrid.addEventListener("click", handleCalendarClick);
     dom.employeeCalendarGrid.addEventListener("click", handleCalendarClick);
     dom.shiftForm.addEventListener("submit", handleShiftSubmit);
@@ -961,7 +986,7 @@ function renderEmployeeShiftPills(dateKey) {
 function renderShiftEmployeeOptions() {
     const employees = getManagerEmployees();
     const bookedEmployeeIds = new Set((state.shifts[selectedDate] || []).map((shift) => shift.employeeId));
-    const firstAvailableEmployee = employees.find((employee) => !bookedEmployeeIds.has(employee.id));
+    const firstAvailableEmployee = employees.find(canSelectAvailabilityBuilderEmployee);
     if (!employees.length) {
         dom.shiftEmployee.innerHTML = `<option value="">No employees yet</option>`;
         dom.shiftEmployee.disabled = true;
@@ -975,8 +1000,13 @@ function renderShiftEmployeeOptions() {
         <optgroup label="${escapeHtml(group.label)}">
             ${group.employees.map((employee) => {
                 const isBooked = bookedEmployeeIds.has(employee.id);
-                const optionLabel = isBooked ? `${employee.name} - already scheduled` : employee.name;
-                return `<option value="${employee.id}" ${isBooked ? "disabled" : ""}>${escapeHtml(optionLabel)}</option>`;
+                const availability = getAvailability(employee.id, selectedDate);
+                const isUnavailable = availability && availability.status === "unavailable";
+                const availabilityText = availability ? formatAvailabilityDetail(availability) : "No availability";
+                const optionLabel = isBooked
+                    ? `${employee.name} - already scheduled`
+                    : `${employee.name} - ${availabilityText}`;
+                return `<option value="${employee.id}" ${isBooked || isUnavailable ? "disabled" : ""}>${escapeHtml(optionLabel)}</option>`;
             }).join("")}
         </optgroup>
     `).join("");
@@ -1131,11 +1161,15 @@ function renderAvailabilityMatrix() {
 
     const header = [
         `<div class="matrix-day"></div>`,
-        ...days.map((date) => `
-            <div class="matrix-day">
+        ...days.map((date) => {
+            const dateKey = formatDate(date);
+            const isSelected = dateKey === selectedDate;
+            return `
+            <button class="matrix-day matrix-day-button ${isSelected ? "selected" : ""}" type="button" data-action="select-availability-date" data-date="${dateKey}">
                 <span>${date.getDate()}</span>
-            </div>
-        `)
+            </button>
+        `;
+        })
     ];
 
     const rows = getGroupedEmployees(employees, manager.area).flatMap((group) => {
@@ -1145,10 +1179,11 @@ function renderAvailabilityMatrix() {
             ...group.employees.flatMap((employee) => [
                 `<div class="matrix-employee">${escapeHtml(employee.name)}</div>`,
                 ...days.map((date) => {
-                    const availability = getAvailability(employee.id, formatDate(date));
+                    const dateKey = formatDate(date);
+                    const availability = getAvailability(employee.id, dateKey);
                     const label = availability ? statusShort(availability.status) : "";
                     const title = availability ? `${employee.name}: ${statusLabel(availability.status)}` : `${employee.name}: no entry`;
-                    return `<div class="matrix-cell ${availability ? availability.status : ""}" title="${escapeHtml(title)}">${label}</div>`;
+                    return `<div class="matrix-cell ${availability ? availability.status : ""} ${dateKey === selectedDate ? "selected-column" : ""}" title="${escapeHtml(title)}">${label}</div>`;
                 })
             ])
         ];
@@ -1157,7 +1192,107 @@ function renderAvailabilityMatrix() {
     dom.availabilityMatrix.innerHTML = employees.length
         ? [...header, ...rows].join("")
         : `<p class="empty-state">No employees have been added yet.</p>`;
+    renderAvailabilityBuilder();
     requestAnimationFrame(updateAvailabilityScrollControls);
+}
+
+function renderAvailabilityBuilder() {
+    const manager = getCurrentManagerConfig();
+    const employees = getManagerEmployees();
+    const visibleEmployees = getAvailabilityBuilderVisibleEmployees(employees);
+    const summary = getAvailabilitySummary(selectedDate, employees);
+    const scheduledCount = (state.shifts[selectedDate] || []).filter((shift) => employees.some((employee) => employee.id === shift.employeeId)).length;
+    const noEntryCount = Math.max(0, employees.length - summary.available - summary.maybe - summary.unavailable);
+
+    availabilityBuilderSelectedIds = new Set([...availabilityBuilderSelectedIds].filter((employeeId) => {
+        const employee = getEmployee(employeeId);
+        return employee && canSelectAvailabilityBuilderEmployee(employee);
+    }));
+
+    dom.availabilityBuilderSelectedDate.textContent = longDate(selectedDate);
+    dom.availabilityBuilderStats.innerHTML = [
+        renderBuilderStat("Available", summary.available, "available"),
+        renderBuilderStat("Maybe", summary.maybe, "maybe"),
+        renderBuilderStat("Unavailable", summary.unavailable, "unavailable"),
+        renderBuilderStat("No entry", noEntryCount, "none"),
+        renderBuilderStat("Scheduled", scheduledCount, "scheduled")
+    ].join("");
+
+    document.querySelectorAll("[data-builder-filter]").forEach((button) => {
+        button.classList.toggle("active", button.dataset.builderFilter === availabilityBuilderFilter);
+    });
+
+    const groups = getGroupedEmployees(visibleEmployees, manager.area).filter((group) => group.employees.length);
+    dom.availabilityBuilderList.innerHTML = groups.length
+        ? groups.map((group) => `
+            <section class="builder-person-group">
+                <p class="group-label">${escapeHtml(group.label)}</p>
+                ${group.employees.map(renderAvailabilityBuilderPerson).join("")}
+            </section>
+        `).join("")
+        : `<p class="empty-state">No employees match this view.</p>`;
+
+    dom.builderVisibleCount.textContent = `${visibleEmployees.length} shown`;
+    dom.builderSelectedCount.textContent = `${availabilityBuilderSelectedIds.size} selected`;
+    dom.builderAddSelectedBtn.disabled = availabilityBuilderSelectedIds.size === 0;
+    refreshIcons();
+}
+
+function renderBuilderStat(label, count, status) {
+    return `
+        <div class="builder-stat ${status}">
+            <span>${escapeHtml(label)}</span>
+            <strong>${count}</strong>
+        </div>
+    `;
+}
+
+function renderAvailabilityBuilderPerson(employee) {
+    const availability = getAvailability(employee.id, selectedDate);
+    const scheduledShifts = getEmployeeShiftsForDate(employee.id, selectedDate);
+    const scheduled = scheduledShifts.length > 0;
+    const selectable = canSelectAvailabilityBuilderEmployee(employee);
+    const selected = availabilityBuilderSelectedIds.has(employee.id);
+    const status = scheduled ? "scheduled" : (availability ? availability.status : "none");
+    const statusText = scheduled ? "Scheduled" : statusLabel(status);
+    const detail = scheduled ? scheduledShifts.map((shift) => `${shift.start}-${shift.end}`).join(", ") : formatAvailabilityDetail(availability);
+
+    return `
+        <label class="builder-person ${status} ${selected ? "selected" : ""} ${selectable ? "" : "disabled"}">
+            <input type="checkbox" value="${escapeHtml(employee.id)}" data-builder-checkbox ${selected ? "checked" : ""} ${selectable ? "" : "disabled"}>
+            <span class="employee-color" style="background:${safeAccentColor(employee.color)}"></span>
+            <span class="builder-person-main">
+                <strong>${escapeHtml(employee.name)}</strong>
+                <small>${escapeHtml(employee.role || employeeCategoryLabel(employee))}</small>
+            </span>
+            <span class="builder-person-status">
+                <b>${escapeHtml(statusText)}</b>
+                <small>${escapeHtml(detail)}</small>
+            </span>
+        </label>
+    `;
+}
+
+function getAvailabilityBuilderVisibleEmployees(employees = getManagerEmployees()) {
+    return employees.filter((employee) => {
+        const availability = getAvailability(employee.id, selectedDate);
+        const scheduled = hasEmployeeShiftOnDate(employee.id, selectedDate);
+        if (availabilityBuilderFilter === "available") return availability && availability.status === "available" && !scheduled;
+        if (availabilityBuilderFilter === "flexible") return availability && ["available", "maybe"].includes(availability.status) && !scheduled;
+        if (availabilityBuilderFilter === "unscheduled") return !scheduled;
+        return true;
+    });
+}
+
+function canSelectAvailabilityBuilderEmployee(employee) {
+    const availability = getAvailability(employee.id, selectedDate);
+    return !hasEmployeeShiftOnDate(employee.id, selectedDate) && (!availability || availability.status !== "unavailable");
+}
+
+function formatAvailabilityDetail(availability) {
+    if (!availability) return "No availability added";
+    const time = availability.start && availability.end ? `${availability.start}-${availability.end}` : "";
+    return [statusLabel(availability.status), time, availability.note].filter(Boolean).join(", ");
 }
 
 function renderEmployees() {
@@ -1210,13 +1345,82 @@ function renderEmployees() {
 function handleCalendarClick(event) {
     const cell = event.target.closest(".day-cell");
     if (!cell) return;
-    selectedDate = cell.dataset.date;
-    const parsed = parseDate(selectedDate);
-    if (parsed.getMonth() !== currentMonth.getMonth() || parsed.getFullYear() !== currentMonth.getFullYear()) {
-        currentMonth = startOfMonth(parsed);
+    setSelectedDate(parseDate(cell.dataset.date));
+}
+
+function handleManagerAvailabilityClick(event) {
+    const dateButton = event.target.closest("[data-action='select-availability-date']");
+    if (dateButton) {
+        setSelectedDate(parseDate(dateButton.dataset.date));
+        return;
     }
-    renderActiveView();
-    renderMonthLabel();
+
+    const filterButton = event.target.closest("[data-builder-filter]");
+    if (filterButton) {
+        availabilityBuilderFilter = filterButton.dataset.builderFilter;
+        availabilityBuilderSelectedIds.clear();
+        dom.availabilityBuilderMessage.textContent = "";
+        renderAvailabilityBuilder();
+        return;
+    }
+
+    if (event.target.closest("#builderSelectShownBtn")) {
+        availabilityBuilderSelectedIds = new Set(
+            getAvailabilityBuilderVisibleEmployees()
+                .filter(canSelectAvailabilityBuilderEmployee)
+                .map((employee) => employee.id)
+        );
+        dom.availabilityBuilderMessage.textContent = "";
+        renderAvailabilityBuilder();
+        return;
+    }
+
+    if (event.target.closest("#builderClearSelectionBtn")) {
+        availabilityBuilderSelectedIds.clear();
+        dom.availabilityBuilderMessage.textContent = "";
+        renderAvailabilityBuilder();
+    }
+}
+
+function handleAvailabilityBuilderSelectionChange(event) {
+    const checkbox = event.target.closest("[data-builder-checkbox]");
+    if (!checkbox) return;
+
+    if (checkbox.checked) {
+        availabilityBuilderSelectedIds.add(checkbox.value);
+    } else {
+        availabilityBuilderSelectedIds.delete(checkbox.value);
+    }
+    dom.availabilityBuilderMessage.textContent = "";
+    renderAvailabilityBuilder();
+}
+
+function handleAvailabilityScheduleSubmit(event) {
+    event.preventDefault();
+    const selectedEmployees = [...availabilityBuilderSelectedIds]
+        .map(getEmployee)
+        .filter((employee) => employee && canSelectAvailabilityBuilderEmployee(employee));
+
+    if (!selectedEmployees.length) {
+        dom.availabilityBuilderMessage.textContent = "Select at least one available employee.";
+        renderAvailabilityBuilder();
+        return;
+    }
+
+    const newShifts = selectedEmployees.map((employee) => createShift({
+        employeeId: employee.id,
+        start: dom.builderShiftStart.value,
+        end: dom.builderShiftEnd.value,
+        role: dom.builderShiftRole.value.trim(),
+        note: dom.builderShiftNote.value.trim()
+    }));
+
+    state.shifts[selectedDate] = [...(state.shifts[selectedDate] || []), ...newShifts];
+    saveState();
+    availabilityBuilderSelectedIds.clear();
+    dom.builderShiftNote.value = "";
+    renderAvailabilityMatrix();
+    dom.availabilityBuilderMessage.textContent = `Added ${newShifts.length} ${newShifts.length === 1 ? "shift" : "shifts"} for ${longDate(selectedDate)}.`;
 }
 
 function handleShiftSubmit(event) {
@@ -1232,14 +1436,21 @@ function handleShiftSubmit(event) {
         return;
     }
 
-    const shift = {
-        id: `shift-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    const availability = getAvailability(employeeId, selectedDate);
+    if (availability && availability.status === "unavailable") {
+        const employee = getEmployee(employeeId);
+        dom.shiftFormMessage.textContent = `${employee ? employee.name : "This employee"} is unavailable on ${longDate(selectedDate)}.`;
+        renderShiftEmployeeOptions();
+        return;
+    }
+
+    const shift = createShift({
         employeeId,
         start: dom.shiftStart.value,
         end: dom.shiftEnd.value,
         role: dom.shiftRole.value.trim(),
         note: dom.shiftNote.value.trim()
-    };
+    });
 
     state.shifts[selectedDate] = [...(state.shifts[selectedDate] || []), shift];
     saveState();
@@ -1356,14 +1567,29 @@ function removeEmployee(employeeId) {
 function changeMonth(delta) {
     currentMonth = addMonths(currentMonth, delta);
     selectedDate = formatDate(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1));
+    availabilityBuilderSelectedIds.clear();
     renderMonthLabel();
     renderActiveView();
 }
 
 function jumpToToday() {
-    const today = new Date();
-    currentMonth = startOfMonth(today);
-    selectedDate = formatDate(today);
+    setSelectedDate(new Date());
+}
+
+function changeBuilderDay(delta) {
+    const date = parseDate(selectedDate);
+    date.setDate(date.getDate() + delta);
+    setSelectedDate(date);
+}
+
+function jumpBuilderToToday() {
+    setSelectedDate(new Date());
+}
+
+function setSelectedDate(date) {
+    currentMonth = startOfMonth(date);
+    selectedDate = formatDate(date);
+    availabilityBuilderSelectedIds.clear();
     renderMonthLabel();
     renderActiveView();
 }
@@ -1383,6 +1609,17 @@ function getAvailability(employeeId, dateKey) {
 
 function hasEmployeeShiftOnDate(employeeId, dateKey) {
     return (state.shifts[dateKey] || []).some((shift) => shift.employeeId === employeeId);
+}
+
+function createShift({ employeeId, start, end, role, note }) {
+    return {
+        id: `shift-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        employeeId,
+        start,
+        end,
+        role,
+        note
+    };
 }
 
 function getAvailabilitySummary(dateKey, employees = state.employees) {
