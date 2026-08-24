@@ -97,6 +97,7 @@ function captureDom() {
         "exportPdfBtn",
         "monthLabel",
         "printHeading",
+        "printPacket",
         "managerScheduleView",
         "employeeAvailabilityView",
         "managerAvailabilityView",
@@ -319,6 +320,23 @@ function getGroupedEmployees(employees, area = "boh") {
         ...category,
         employees: employees.filter((employee) => getEmployeeCategory(employee) === category.id)
     }));
+}
+
+function getPrintEmployeeGroups(employees, area) {
+    const maxRowsPerPage = 16;
+    return getGroupedEmployees(employees, area)
+        .filter((group) => group.employees.length)
+        .flatMap((group) => {
+            const chunks = chunkArray(group.employees, maxRowsPerPage);
+            return chunks.map((employeesChunk, index) => ({
+                label: chunks.length > 1 ? `${group.label} ${index + 1}/${chunks.length}` : group.label,
+                employees: employeesChunk
+            }));
+        });
+}
+
+function chunkArray(items, size) {
+    return Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, index * size + size));
 }
 
 function employeeCategoryLabel(employee) {
@@ -555,18 +573,243 @@ function renderPrintHeading() {
 }
 
 function exportCurrentViewAsPdf() {
+    const useSchedulePacket = currentUser && currentUser.type === "manager" && activeView === "schedule";
+    const manager = useSchedulePacket ? getCurrentManagerConfig() : null;
+    const exportTitle = useSchedulePacket
+        ? `Oak34 ${manager.label} Schedule - ${monthTitle(currentMonth)}`
+        : (dom.printHeading.textContent || "Oak34 Kitchen Schedule");
+
     previousDocumentTitle = document.title;
-    document.body.classList.add("pdf-exporting");
-    document.title = `${(dom.printHeading.textContent || "Oak34 Kitchen Schedule").replace(/\s+/g, "-")}`;
-    renderActiveView();
+    document.body.classList.add(useSchedulePacket ? "pdf-packet-exporting" : "pdf-exporting");
+    document.title = exportTitle.replace(/\s+/g, "-");
+    if (useSchedulePacket) {
+        renderSchedulePrintPacket();
+    } else {
+        renderActiveView();
+    }
     setTimeout(() => window.print(), 80);
 }
 
 function cleanupPdfExport() {
-    if (!document.body.classList.contains("pdf-exporting")) return;
+    if (!document.body.classList.contains("pdf-exporting") && !document.body.classList.contains("pdf-packet-exporting")) return;
     document.body.classList.remove("pdf-exporting");
+    document.body.classList.remove("pdf-packet-exporting");
+    dom.printPacket.innerHTML = "";
     document.title = previousDocumentTitle;
     renderActiveView();
+}
+
+function renderSchedulePrintPacket() {
+    const manager = getCurrentManagerConfig();
+    const employees = getManagerEmployees();
+    const weeks = getMonthWeeks(currentMonth);
+    const title = `Oak34 ${manager.label} Schedule`;
+    const subtitle = monthTitle(currentMonth);
+    const generated = new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    }).format(new Date());
+
+    dom.printPacket.innerHTML = [
+        ...weeks.flatMap((week, index) => renderPrintWeekPages(week, index, manager, employees, title, subtitle, generated)),
+        renderPrintTotalsPage(manager, employees, title, subtitle, generated),
+        renderPrintCoveragePage(manager, employees, title, subtitle, generated)
+    ].join("");
+}
+
+function renderPrintPageHeader(title, subtitle, kicker, generated, stats) {
+    return `
+        <header class="print-page-head">
+            <div class="print-title-block">
+                <span class="print-logo oak-logo-mark" aria-hidden="true"></span>
+                <div>
+                    <p>${escapeHtml(kicker)}</p>
+                    <h1>${escapeHtml(title)}</h1>
+                    <span>${escapeHtml(subtitle)}</span>
+                </div>
+            </div>
+            <div class="print-meta">
+                <strong>${escapeHtml(stats)}</strong>
+                <span>Generated ${escapeHtml(generated)}</span>
+            </div>
+        </header>
+    `;
+}
+
+function renderPrintWeekPages(week, index, manager, employees, title, subtitle, generated) {
+    const monthDates = week.filter((date) => isSameMonth(date, currentMonth));
+    const printGroups = getPrintEmployeeGroups(employees, manager.area);
+    if (!printGroups.length) {
+        return [renderPrintWeekPage(week, index, { label: "Team", employees: [] }, monthDates, title, subtitle, generated)];
+    }
+    return printGroups.map((printGroup) => renderPrintWeekPage(week, index, printGroup, monthDates, title, subtitle, generated));
+}
+
+function renderPrintWeekPage(week, index, printGroup, monthDates, title, subtitle, generated) {
+    const weekDateKeys = monthDates.map(formatDate);
+    const weekStats = getShiftStatsForDates(weekDateKeys, printGroup.employees);
+    const stats = `${weekStats.shifts} ${weekStats.shifts === 1 ? "shift" : "shifts"} | ${formatHours(weekStats.minutes)}`;
+    const bodyRows = printGroup.employees.length
+        ? `
+            <tr class="print-group-row">
+                <td colspan="8">${escapeHtml(printGroup.label)}</td>
+            </tr>
+            ${printGroup.employees.map((employee) => renderPrintEmployeeWeekRow(employee, week)).join("")}
+        `
+        : `<tr><td colspan="8" class="print-empty-row">No employees have been added yet.</td></tr>`;
+
+    return `
+        <article class="print-page schedule-week-page">
+            ${renderPrintPageHeader(title, subtitle, `Week ${index + 1}: ${formatDateRange(monthDates)} | ${printGroup.label}`, generated, stats)}
+            <table class="print-schedule-table">
+                <thead>
+                    <tr>
+                        <th class="print-employee-col">Employee</th>
+                        ${week.map((date) => `
+                            <th class="${isSameMonth(date, currentMonth) ? "" : "print-outside"}">
+                                <span>${escapeHtml(formatPrintWeekday(date))}</span>
+                                <strong>${escapeHtml(formatPrintDate(date))}</strong>
+                            </th>
+                        `).join("")}
+                    </tr>
+                </thead>
+                <tbody>${bodyRows}</tbody>
+            </table>
+        </article>
+    `;
+}
+
+function renderPrintEmployeeWeekRow(employee, week) {
+    return `
+        <tr>
+            <th>
+                <span class="print-employee-name">${escapeHtml(employee.name)}</span>
+                <small>${escapeHtml(employee.role || employeeCategoryLabel(employee))}</small>
+            </th>
+            ${week.map((date) => {
+                const outside = !isSameMonth(date, currentMonth);
+                const shifts = outside ? [] : getEmployeeShiftsForDate(employee.id, formatDate(date));
+                return `
+                    <td class="${outside ? "print-outside" : ""}">
+                        ${shifts.length ? shifts.map((shift) => renderPrintShift(shift, employee)).join("") : `<span class="print-empty-cell">-</span>`}
+                    </td>
+                `;
+            }).join("")}
+        </tr>
+    `;
+}
+
+function renderPrintShift(shift, employee) {
+    const role = shift.role || employee.role || "Shift";
+    const note = shift.note ? `<small>${escapeHtml(shift.note)}</small>` : "";
+    return `
+        <div class="print-shift" style="--employee-color:${safeAccentColor(employee.color)}">
+            <strong>${escapeHtml(shift.start)}-${escapeHtml(shift.end)}</strong>
+            <span>${escapeHtml(role)}</span>
+            ${note}
+        </div>
+    `;
+}
+
+function renderPrintTotalsPage(manager, employees, title, subtitle, generated) {
+    const totals = getMonthlyHoursByEmployee(currentMonth, employees);
+    const teamMinutes = totals.reduce((sum, item) => sum + item.minutes, 0);
+    const teamShifts = totals.reduce((sum, item) => sum + item.shifts, 0);
+    const groups = getGroupedEmployees(employees, manager.area).filter((group) => group.employees.length);
+    const groupedTotals = groups.length
+        ? groups.map((group) => `
+            <tr class="print-group-row">
+                <td colspan="5">${escapeHtml(group.label)}</td>
+            </tr>
+            ${group.employees.map((employee) => {
+                const total = totals.find((item) => item.employee.id === employee.id);
+                const average = total && total.shifts ? Math.round(total.minutes / total.shifts) : 0;
+                return `
+                    <tr>
+                        <th>${escapeHtml(employee.name)}</th>
+                        <td>${escapeHtml(employee.role || employeeCategoryLabel(employee))}</td>
+                        <td>${total ? total.shifts : 0}</td>
+                        <td>${formatHours(total ? total.minutes : 0)}</td>
+                        <td>${average ? formatHours(average) : "-"}</td>
+                    </tr>
+                `;
+            }).join("")}
+        `).join("")
+        : `<tr><td colspan="5" class="print-empty-row">No employees have been added yet.</td></tr>`;
+
+    return `
+        <article class="print-page print-summary-page">
+            ${renderPrintPageHeader(title, subtitle, "Monthly employee totals", generated, `${teamShifts} shifts | ${formatHours(teamMinutes)}`)}
+            <div class="print-summary-cards">
+                <div>
+                    <span>Team hours</span>
+                    <strong>${formatHours(teamMinutes)}</strong>
+                </div>
+                <div>
+                    <span>Scheduled shifts</span>
+                    <strong>${teamShifts}</strong>
+                </div>
+                <div>
+                    <span>Team members</span>
+                    <strong>${employees.length}</strong>
+                </div>
+            </div>
+            <table class="print-totals-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Role</th>
+                        <th>Shifts</th>
+                        <th>Hours</th>
+                        <th>Avg shift</th>
+                    </tr>
+                </thead>
+                <tbody>${groupedTotals}</tbody>
+            </table>
+        </article>
+    `;
+}
+
+function renderPrintCoveragePage(manager, employees, title, subtitle, generated) {
+    const days = getMonthDates(currentMonth);
+    const teamStats = getShiftStatsForDates(days.map(formatDate), employees);
+    return `
+        <article class="print-page print-coverage-page">
+            ${renderPrintPageHeader(title, subtitle, "Daily coverage", generated, `${teamStats.shifts} shifts | ${formatHours(teamStats.minutes)}`)}
+            <table class="print-coverage-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Shifts</th>
+                        <th>Hours</th>
+                        <th>Available</th>
+                        <th>Maybe</th>
+                        <th>Unavailable</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${days.map((date) => {
+                        const dateKey = formatDate(date);
+                        const stats = getShiftStatsForDates([dateKey], employees);
+                        const availability = getAvailabilitySummary(dateKey, employees);
+                        return `
+                            <tr>
+                                <th>${escapeHtml(formatPrintWeekday(date))} ${escapeHtml(formatPrintDate(date))}</th>
+                                <td>${stats.shifts}</td>
+                                <td>${formatHours(stats.minutes)}</td>
+                                <td>${availability.available}</td>
+                                <td>${availability.maybe}</td>
+                                <td>${availability.unavailable}</td>
+                            </tr>
+                        `;
+                    }).join("")}
+                </tbody>
+            </table>
+        </article>
+    `;
 }
 
 function scrollStrip(container, direction) {
@@ -684,7 +927,10 @@ function renderEmployeeStatusBadge(dateKey) {
 
 function renderShiftPills(dateKey) {
     const visibleEmployeeIds = new Set(getManagerEmployees().map((employee) => employee.id));
-    const shifts = (state.shifts[dateKey] || []).filter((shift) => visibleEmployeeIds.has(shift.employeeId));
+    const shifts = sortShiftsByStart((state.shifts[dateKey] || []).filter((shift) => visibleEmployeeIds.has(shift.employeeId)));
+    if (!shifts.length) return "";
+
+    const totalMinutes = shifts.reduce((sum, shift) => sum + getShiftMinutes(shift), 0);
     const visible = shifts.slice(0, 2).map((shift) => {
         const employee = getEmployee(shift.employeeId);
         const color = employee ? employee.color : "#8e8e93";
@@ -695,7 +941,10 @@ function renderShiftPills(dateKey) {
         `;
     });
     if (shifts.length > 2) visible.push(`<span class="more-count">+${shifts.length - 2} more</span>`);
-    return visible.join("");
+    return [
+        `<div class="day-load"><span>${shifts.length} ${shifts.length === 1 ? "shift" : "shifts"}</span><strong>${formatHours(totalMinutes)}</strong></div>`,
+        ...visible
+    ].join("");
 }
 
 function renderEmployeeShiftPills(dateKey) {
@@ -814,13 +1063,20 @@ function renderManagerDayAvailability() {
 
 function renderDayShifts() {
     const visibleEmployeeIds = new Set(getManagerEmployees().map((employee) => employee.id));
-    const shifts = (state.shifts[selectedDate] || []).filter((shift) => visibleEmployeeIds.has(shift.employeeId));
+    const shifts = sortShiftsByStart((state.shifts[selectedDate] || []).filter((shift) => visibleEmployeeIds.has(shift.employeeId)));
     if (!shifts.length) {
         dom.dayShiftList.innerHTML = `<p class="empty-state">No shifts for this day.</p>`;
         return;
     }
 
-    dom.dayShiftList.innerHTML = shifts.map((shift) => {
+    const totalMinutes = shifts.reduce((sum, shift) => sum + getShiftMinutes(shift), 0);
+    const summary = `
+        <div class="list-summary">
+            <strong>${shifts.length} ${shifts.length === 1 ? "shift" : "shifts"}</strong>
+            <span>${formatHours(totalMinutes)} scheduled</span>
+        </div>
+    `;
+    dom.dayShiftList.innerHTML = summary + shifts.map((shift) => {
         const employee = getEmployee(shift.employeeId);
         const color = employee ? employee.color : "#8e8e93";
         return `
@@ -1168,6 +1424,30 @@ function getShiftMinutes(shift) {
     return end > start ? end - start : end + 24 * 60 - start;
 }
 
+function getShiftStatsForDates(dateKeys, employees) {
+    const employeeIds = new Set(employees.map((employee) => employee.id));
+    const shifts = dateKeys.flatMap((dateKey) => (state.shifts[dateKey] || []).filter((shift) => employeeIds.has(shift.employeeId)));
+    return {
+        shifts: shifts.length,
+        minutes: shifts.reduce((sum, shift) => sum + getShiftMinutes(shift), 0)
+    };
+}
+
+function getEmployeeShiftsForDate(employeeId, dateKey) {
+    return sortShiftsByStart((state.shifts[dateKey] || []).filter((shift) => shift.employeeId === employeeId));
+}
+
+function sortShiftsByStart(shifts) {
+    return [...shifts].sort((first, second) => {
+        const firstStart = timeToMinutes(first.start) ?? Number.MAX_SAFE_INTEGER;
+        const secondStart = timeToMinutes(second.start) ?? Number.MAX_SAFE_INTEGER;
+        if (firstStart !== secondStart) return firstStart - secondStart;
+        const firstEmployee = getEmployee(first.employeeId);
+        const secondEmployee = getEmployee(second.employeeId);
+        return (firstEmployee ? firstEmployee.name : "").localeCompare(secondEmployee ? secondEmployee.name : "");
+    });
+}
+
 function timeToMinutes(value) {
     const match = /^(\d{2}):(\d{2})$/.exec(value || "");
     if (!match) return null;
@@ -1196,6 +1476,12 @@ function getCalendarCells(monthDate) {
         date.setDate(start.getDate() + index);
         return date;
     });
+}
+
+function getMonthWeeks(monthDate) {
+    const cells = getCalendarCells(monthDate);
+    const weeks = Array.from({ length: Math.ceil(cells.length / 7) }, (_, index) => cells.slice(index * 7, index * 7 + 7));
+    return weeks.filter((week) => week.some((date) => isSameMonth(date, monthDate)));
 }
 
 function getMonthDates(monthDate) {
@@ -1233,6 +1519,19 @@ function longDate(dateKey) {
         month: "long",
         day: "numeric"
     }).format(parseDate(dateKey));
+}
+
+function formatPrintWeekday(date) {
+    return new Intl.DateTimeFormat("en-US", { weekday: "short" }).format(date);
+}
+
+function formatPrintDate(date) {
+    return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+}
+
+function formatDateRange(dates) {
+    if (!dates.length) return monthTitle(currentMonth);
+    return `${formatPrintDate(dates[0])} - ${formatPrintDate(dates[dates.length - 1])}`;
 }
 
 function normalizeCode(code) {
@@ -1281,6 +1580,10 @@ function escapeHtml(value) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+}
+
+function safeAccentColor(value) {
+    return /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(String(value)) ? value : "#9d3448";
 }
 
 function refreshIcons() {
