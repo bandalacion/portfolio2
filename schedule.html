@@ -91,9 +91,16 @@
                         <i data-lucide="calendar"></i>
                         <span>Today</span>
                     </button>
+                    <label class="export-mode manager-only" for="exportMode">
+                        <span>Export</span>
+                        <select id="exportMode">
+                            <option value="schedule">Schedule only</option>
+                            <option value="full">Full report</option>
+                        </select>
+                    </label>
                     <button class="secondary-button" id="exportPdfBtn" type="button">
                         <i data-lucide="file-down"></i>
-                        <span>Export PDF</span>
+                        <span id="exportPdfLabel">Export PDF</span>
                     </button>
                     <button class="icon-button" id="nextMonthBtn" type="button" aria-label="Next month" title="Next month">
                         <i data-lucide="chevron-right"></i>

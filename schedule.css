@@ -455,6 +455,34 @@ select:focus {
     gap: 0.5rem;
 }
 
+.export-mode {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 40px;
+    padding: 0.35rem 0.5rem 0.35rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.export-mode span {
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.export-mode select {
+    width: auto;
+    min-height: 30px;
+    padding: 0.2rem 1.8rem 0.2rem 0.45rem;
+    border: 0;
+    background-color: transparent;
+    font-size: 0.86rem;
+    font-weight: 800;
+}
+
 .print-heading {
     display: none;
 }
@@ -1434,10 +1462,15 @@ svg {
     .brand-link span:last-child,
     .session-pill,
     .sync-pill,
+    .export-mode span,
     .side-nav-item span,
     .secondary-button span,
     .ghost-button span {
         display: none;
+    }
+
+    .export-mode select {
+        max-width: 135px;
     }
 
     .planner,
@@ -1759,7 +1792,8 @@ svg {
 
     .print-schedule-table,
     .print-totals-table,
-    .print-coverage-table {
+    .print-coverage-table,
+    .print-availability-table {
         width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
@@ -1770,7 +1804,9 @@ svg {
     .print-totals-table th,
     .print-totals-table td,
     .print-coverage-table th,
-    .print-coverage-table td {
+    .print-coverage-table td,
+    .print-availability-table th,
+    .print-availability-table td {
         border: 1px solid #d8d8dc;
         vertical-align: top;
     }
@@ -1922,5 +1958,54 @@ svg {
 
     .print-coverage-table {
         max-width: 190mm;
+    }
+
+    .print-availability-table th,
+    .print-availability-table td {
+        padding: 1mm 0.8mm;
+        text-align: center;
+    }
+
+    .print-availability-table thead th {
+        background: #f5f5f7;
+        color: #6e6e73;
+        font-size: 5.6pt;
+        font-weight: 900;
+    }
+
+    .print-availability-table thead th:first-child,
+    .print-availability-table tbody th {
+        width: 38mm;
+        text-align: left;
+    }
+
+    .print-availability-table tbody th {
+        background: #fbfbfd;
+        padding: 1.3mm;
+    }
+
+    .print-availability-table td {
+        color: #1d1d1f;
+        font-size: 6pt;
+        font-weight: 900;
+    }
+
+    .print-availability-table td.available {
+        background: rgba(52, 199, 89, 0.2);
+        color: #177232;
+    }
+
+    .print-availability-table td.maybe {
+        background: rgba(255, 149, 0, 0.2);
+        color: #955700;
+    }
+
+    .print-availability-table td.unavailable {
+        background: rgba(255, 59, 48, 0.18);
+        color: #a4231d;
+    }
+
+    .print-availability-table td.availability-none {
+        color: #a1a1a6;
     }
 }

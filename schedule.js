@@ -97,6 +97,8 @@ function captureDom() {
         "nextMonthBtn",
         "todayBtn",
         "exportPdfBtn",
+        "exportPdfLabel",
+        "exportMode",
         "monthLabel",
         "printHeading",
         "printPacket",
@@ -172,6 +174,7 @@ function bindEvents() {
     dom.nextMonthBtn.addEventListener("click", () => changeMonth(1));
     dom.todayBtn.addEventListener("click", jumpToToday);
     dom.exportPdfBtn.addEventListener("click", exportCurrentViewAsPdf);
+    dom.exportMode.addEventListener("change", updateExportControls);
     dom.hoursScrollPrev.addEventListener("click", () => scrollStrip(dom.managerHoursSummary, -1));
     dom.hoursScrollNext.addEventListener("click", () => scrollStrip(dom.managerHoursSummary, 1));
     dom.managerHoursSummary.addEventListener("scroll", updateHoursScrollControls);
@@ -544,6 +547,19 @@ function renderNavigation() {
     document.querySelectorAll(".side-nav-item").forEach((item) => {
         item.classList.toggle("active", item.dataset.view === activeView);
     });
+    updateExportControls();
+}
+
+function updateExportControls() {
+    if (!currentUser) return;
+    if (currentUser.type === "employee") {
+        dom.exportPdfLabel.textContent = "Export schedule";
+        return;
+    }
+
+    dom.exportPdfLabel.textContent = dom.exportMode.value === "full"
+        ? "Export full PDF"
+        : "Export schedule";
 }
 
 function renderActiveView() {
@@ -598,21 +614,30 @@ function renderPrintHeading() {
 }
 
 function exportCurrentViewAsPdf() {
-    const useSchedulePacket = currentUser && currentUser.type === "manager" && activeView === "schedule";
-    const manager = useSchedulePacket ? getCurrentManagerConfig() : null;
-    const exportTitle = useSchedulePacket
-        ? `Oak34 ${manager.label} Schedule - ${monthTitle(currentMonth)}`
-        : (dom.printHeading.textContent || "Oak34 Kitchen Schedule");
+    const isManager = currentUser && currentUser.type === "manager";
+    const exportMode = isManager ? dom.exportMode.value : "schedule";
+    const exportTitle = getPdfExportTitle(exportMode);
 
     previousDocumentTitle = document.title;
-    document.body.classList.add(useSchedulePacket ? "pdf-packet-exporting" : "pdf-exporting");
+    document.body.classList.add("pdf-packet-exporting");
     document.title = exportTitle.replace(/\s+/g, "-");
-    if (useSchedulePacket) {
-        renderSchedulePrintPacket();
+    if (isManager) {
+        renderManagerSchedulePrintPacket({ includeFullData: exportMode === "full" });
     } else {
-        renderActiveView();
+        renderEmployeeSchedulePrintPacket();
     }
     setTimeout(() => window.print(), 80);
+}
+
+function getPdfExportTitle(exportMode) {
+    if (currentUser && currentUser.type === "manager") {
+        const manager = getCurrentManagerConfig();
+        const reportName = exportMode === "full" ? "Full Report" : "Schedule";
+        return `Oak34 ${manager.label} ${reportName} - ${monthTitle(currentMonth)}`;
+    }
+
+    const employee = getCurrentEmployee();
+    return `Oak34 Schedule - ${employee ? employee.name : "Employee"} - ${monthTitle(currentMonth)}`;
 }
 
 function cleanupPdfExport() {
@@ -624,7 +649,7 @@ function cleanupPdfExport() {
     renderActiveView();
 }
 
-function renderSchedulePrintPacket() {
+function renderManagerSchedulePrintPacket({ includeFullData = false } = {}) {
     const manager = getCurrentManagerConfig();
     const employees = getManagerEmployees();
     const weeks = getMonthWeeks(currentMonth);
@@ -638,11 +663,42 @@ function renderSchedulePrintPacket() {
         minute: "2-digit"
     }).format(new Date());
 
-    dom.printPacket.innerHTML = [
+    const pages = [
         ...weeks.flatMap((week, index) => renderPrintWeekPages(week, index, manager, employees, title, subtitle, generated)),
-        renderPrintTotalsPage(manager, employees, title, subtitle, generated),
-        renderPrintCoveragePage(manager, employees, title, subtitle, generated)
-    ].join("");
+        ...(includeFullData
+            ? [
+                renderPrintTotalsPage(manager, employees, title, subtitle, generated),
+                renderPrintCoveragePage(manager, employees, title, subtitle, generated),
+                ...renderPrintAvailabilityPages(manager, employees, title, subtitle, generated)
+            ]
+            : [])
+    ];
+
+    dom.printPacket.innerHTML = pages.join("");
+}
+
+function renderEmployeeSchedulePrintPacket() {
+    const employee = getCurrentEmployee();
+    if (!employee) return;
+
+    const manager = {
+        area: getEmployeeArea(employee),
+        label: employeeCategoryLabel(employee)
+    };
+    const weeks = getMonthWeeks(currentMonth);
+    const title = "Oak34 Schedule";
+    const subtitle = `${employee.name} - ${monthTitle(currentMonth)}`;
+    const generated = new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    }).format(new Date());
+
+    dom.printPacket.innerHTML = weeks
+        .flatMap((week, index) => renderPrintWeekPages(week, index, manager, [employee], title, subtitle, generated))
+        .join("");
 }
 
 function renderPrintPageHeader(title, subtitle, kicker, generated, stats) {
@@ -835,6 +891,50 @@ function renderPrintCoveragePage(manager, employees, title, subtitle, generated)
             </table>
         </article>
     `;
+}
+
+function renderPrintAvailabilityPages(manager, employees, title, subtitle, generated) {
+    const days = getMonthDates(currentMonth);
+    const printGroups = getPrintEmployeeGroups(employees, manager.area);
+    if (!printGroups.length) {
+        return [`
+            <article class="print-page print-availability-page">
+                ${renderPrintPageHeader(title, subtitle, "Team availability", generated, "No employees")}
+                <p class="print-empty-row">No employees have been added yet.</p>
+            </article>
+        `];
+    }
+
+    return printGroups.map((group) => `
+        <article class="print-page print-availability-page">
+            ${renderPrintPageHeader(title, subtitle, `Availability | ${group.label}`, generated, `${group.employees.length} ${group.employees.length === 1 ? "person" : "people"}`)}
+            <table class="print-availability-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        ${days.map((date) => `<th>${date.getDate()}</th>`).join("")}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${group.employees.map((employee) => `
+                        <tr>
+                            <th>
+                                <span class="print-employee-name">${escapeHtml(employee.name)}</span>
+                                <small>${escapeHtml(employee.role || employeeCategoryLabel(employee))}</small>
+                            </th>
+                            ${days.map((date) => renderPrintAvailabilityCell(employee, formatDate(date))).join("")}
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        </article>
+    `);
+}
+
+function renderPrintAvailabilityCell(employee, dateKey) {
+    const availability = getAvailability(employee.id, dateKey);
+    if (!availability) return `<td class="availability-none">-</td>`;
+    return `<td class="${availability.status}">${escapeHtml(statusShort(availability.status))}</td>`;
 }
 
 function scrollStrip(container, direction) {
