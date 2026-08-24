@@ -124,26 +124,34 @@
                             <span id="publishStatus" class="workflow-note"></span>
                         </div>
                         <div class="workflow-actions" aria-label="Schedule workflow controls">
-                            <button class="secondary-button" id="copyDayBtn" type="button">
-                                <i data-lucide="copy"></i>
-                                <span>Copy day</span>
-                            </button>
-                            <button class="secondary-button" id="pasteDayBtn" type="button" disabled>
-                                <i data-lucide="clipboard-paste"></i>
-                                <span>Paste day</span>
-                            </button>
-                            <button class="secondary-button" id="copyWeekBtn" type="button">
-                                <i data-lucide="copy-check"></i>
-                                <span>Copy week</span>
-                            </button>
-                            <button class="secondary-button" id="pasteWeekBtn" type="button" disabled>
-                                <i data-lucide="calendar-plus"></i>
-                                <span>Paste week</span>
-                            </button>
                             <button class="primary-button" id="publishScheduleBtn" type="button">
                                 <i data-lucide="send"></i>
                                 <span>Publish month</span>
                             </button>
+                            <details class="tool-drawer">
+                                <summary>
+                                    <i data-lucide="sliders-horizontal"></i>
+                                    <span>More tools</span>
+                                </summary>
+                                <div class="tool-drawer-panel">
+                                    <button class="secondary-button" id="copyDayBtn" type="button">
+                                        <i data-lucide="copy"></i>
+                                        <span>Copy day</span>
+                                    </button>
+                                    <button class="secondary-button" id="pasteDayBtn" type="button" disabled>
+                                        <i data-lucide="clipboard-paste"></i>
+                                        <span>Paste day</span>
+                                    </button>
+                                    <button class="secondary-button" id="copyWeekBtn" type="button">
+                                        <i data-lucide="copy-check"></i>
+                                        <span>Copy week</span>
+                                    </button>
+                                    <button class="secondary-button" id="pasteWeekBtn" type="button" disabled>
+                                        <i data-lucide="calendar-plus"></i>
+                                        <span>Paste week</span>
+                                    </button>
+                                </div>
+                            </details>
                         </div>
                     </div>
                     <div class="warning-list" id="scheduleWarnings"></div>
@@ -315,27 +323,8 @@
                             </button>
                         </div>
                     </div>
-                    <div class="builder-stats" id="availabilityBuilderStats"></div>
                     <form class="availability-schedule-form" id="availabilityScheduleForm">
-                        <div class="builder-toolbar">
-                            <div class="filter-tabs" aria-label="Availability filters">
-                                <button class="filter-tab active" type="button" data-builder-filter="available">Available</button>
-                                <button class="filter-tab" type="button" data-builder-filter="flexible">Available + maybe</button>
-                                <button class="filter-tab" type="button" data-builder-filter="unscheduled">Not scheduled</button>
-                                <button class="filter-tab" type="button" data-builder-filter="all">All</button>
-                            </div>
-                            <div class="builder-actions">
-                                <button class="secondary-button" id="builderSelectShownBtn" type="button">
-                                    <i data-lucide="check-check"></i>
-                                    <span>Select shown</span>
-                                </button>
-                                <button class="secondary-button" id="builderClearSelectionBtn" type="button">
-                                    <i data-lucide="x"></i>
-                                    <span>Clear</span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="form-grid builder-shift-fields">
+                        <div class="form-grid builder-shift-fields compact">
                             <label class="field-group">
                                 <span>Template</span>
                                 <select id="builderShiftTemplate"></select>
@@ -352,24 +341,53 @@
                                 <span>End</span>
                                 <input id="builderShiftEnd" type="time" value="17:00" required>
                             </label>
-                            <label class="field-group">
-                                <span>Note</span>
-                                <input id="builderShiftNote" type="text" placeholder="Optional note">
-                            </label>
-                            <label class="field-group">
-                                <span>Private manager note</span>
-                                <input id="builderShiftPrivateNote" type="text" placeholder="Only managers can see this">
-                            </label>
                         </div>
-                        <div class="builder-selection-head">
-                            <strong id="builderSelectedCount">0 selected</strong>
-                            <span id="builderVisibleCount">0 shown</span>
-                        </div>
-                        <div class="builder-people" id="availabilityBuilderList"></div>
-                        <button class="primary-button" id="builderAddSelectedBtn" type="submit">
-                            <i data-lucide="calendar-plus"></i>
-                            <span>Add selected shifts</span>
-                        </button>
+                        <details class="bulk-drawer">
+                            <summary>
+                                <i data-lucide="users-round"></i>
+                                <span>Bulk add and notes</span>
+                            </summary>
+                            <div class="bulk-drawer-panel">
+                                <div class="form-grid builder-note-fields">
+                                    <label class="field-group">
+                                        <span>Note</span>
+                                        <input id="builderShiftNote" type="text" placeholder="Optional note">
+                                    </label>
+                                    <label class="field-group">
+                                        <span>Private manager note</span>
+                                        <input id="builderShiftPrivateNote" type="text" placeholder="Only managers can see this">
+                                    </label>
+                                </div>
+                                <div class="builder-stats" id="availabilityBuilderStats"></div>
+                                <div class="builder-toolbar">
+                                    <div class="filter-tabs" aria-label="Availability filters">
+                                        <button class="filter-tab active" type="button" data-builder-filter="available">Available</button>
+                                        <button class="filter-tab" type="button" data-builder-filter="flexible">Available + maybe</button>
+                                        <button class="filter-tab" type="button" data-builder-filter="unscheduled">Not scheduled</button>
+                                        <button class="filter-tab" type="button" data-builder-filter="all">All</button>
+                                    </div>
+                                    <div class="builder-actions">
+                                        <button class="secondary-button" id="builderSelectShownBtn" type="button">
+                                            <i data-lucide="check-check"></i>
+                                            <span>Select shown</span>
+                                        </button>
+                                        <button class="secondary-button" id="builderClearSelectionBtn" type="button">
+                                            <i data-lucide="x"></i>
+                                            <span>Clear</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="builder-selection-head">
+                                    <strong id="builderSelectedCount">0 selected</strong>
+                                    <span id="builderVisibleCount">0 shown</span>
+                                </div>
+                                <div class="builder-people" id="availabilityBuilderList"></div>
+                                <button class="primary-button" id="builderAddSelectedBtn" type="submit">
+                                    <i data-lucide="calendar-plus"></i>
+                                    <span>Add selected shifts</span>
+                                </button>
+                            </div>
+                        </details>
                         <p class="form-message" id="availabilityBuilderMessage" role="alert"></p>
                     </form>
                 </div>

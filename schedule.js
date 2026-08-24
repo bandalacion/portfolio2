@@ -227,7 +227,7 @@ function bindEvents() {
     dom.managerCalendarGrid.addEventListener("click", handleCalendarClick);
     dom.employeeCalendarGrid.addEventListener("click", handleCalendarClick);
     dom.weekBuilder.addEventListener("click", handleWeekBuilderClick);
-    dom.coveragePanel.addEventListener("input", handleCoverageInput);
+    dom.coveragePanel.addEventListener("change", handleCoverageInput);
     dom.shiftForm.addEventListener("submit", handleShiftSubmit);
     dom.shiftTemplate.addEventListener("change", () => applyShiftTemplate(dom.shiftTemplate.value, "shift"));
     dom.saveShiftTemplateBtn.addEventListener("click", saveCurrentShiftTemplate);
@@ -1205,15 +1205,33 @@ function renderScheduleWarnings() {
         return;
     }
 
-    dom.scheduleWarnings.innerHTML = warnings.map((warning) => `
-        <div class="schedule-warning ${warning.severity || "notice"}">
-            <i data-lucide="${warning.icon || "circle-alert"}"></i>
-            <div>
-                <strong>${escapeHtml(warning.title)}</strong>
-                <span>${escapeHtml(warning.detail)}</span>
+    const dangerCount = warnings.filter((warning) => warning.severity === "danger").length;
+    const noticeCount = warnings.length - dangerCount;
+    const summaryText = [
+        dangerCount ? `${dangerCount} urgent` : "",
+        noticeCount ? `${noticeCount} note${noticeCount === 1 ? "" : "s"}` : ""
+    ].filter(Boolean).join(", ");
+
+    dom.scheduleWarnings.innerHTML = `
+        <details class="warning-drawer">
+            <summary>
+                <i data-lucide="${dangerCount ? "circle-alert" : "info"}"></i>
+                <strong>Needs attention</strong>
+                <span>${escapeHtml(summaryText || `${warnings.length} note${warnings.length === 1 ? "" : "s"}`)}</span>
+            </summary>
+            <div class="warning-drawer-list">
+                ${warnings.map((warning) => `
+                    <div class="schedule-warning ${warning.severity || "notice"}">
+                        <i data-lucide="${warning.icon || "circle-alert"}"></i>
+                        <div>
+                            <strong>${escapeHtml(warning.title)}</strong>
+                            <span>${escapeHtml(warning.detail)}</span>
+                        </div>
+                    </div>
+                `).join("")}
             </div>
-        </div>
-    `).join("");
+        </details>
+    `;
     refreshIcons();
 }
 
@@ -1222,27 +1240,34 @@ function renderCoveragePanel() {
     const groups = getCoverageTargetGroups(manager.area);
     const targets = getCoverageTargets(selectedDate, manager.area);
     const counts = getCoverageCounts(selectedDate, manager.area);
+    const targetSummary = groups
+        .filter((group) => targets[group.id] || counts[group.id])
+        .map((group) => `${counts[group.id] || 0}/${targets[group.id] || 0} ${group.label}`)
+        .join(", ");
     dom.coveragePanel.innerHTML = `
-        <div class="coverage-head">
-            <div>
-                <p class="eyebrow">Coverage targets</p>
-                <h3>Needed today</h3>
+        <details class="coverage-drawer">
+            <summary>
+                <div>
+                    <p class="eyebrow">Coverage</p>
+                    <strong>${escapeHtml(targetSummary || "Set targets")}</strong>
+                </div>
+                <i data-lucide="chevron-down"></i>
+            </summary>
+            <div class="coverage-grid">
+                ${groups.map((group) => {
+                    const target = targets[group.id] || 0;
+                    const count = counts[group.id] || 0;
+                    const status = target && count < target ? "low" : (target && count > target ? "high" : "ok");
+                    return `
+                        <label class="coverage-item ${status}">
+                            <span>${escapeHtml(group.label)}</span>
+                            <input type="number" min="0" step="1" value="${target}" data-coverage-target="${group.id}" aria-label="${escapeHtml(group.label)} target">
+                            <small>${count}/${target || 0} scheduled</small>
+                        </label>
+                    `;
+                }).join("")}
             </div>
-        </div>
-        <div class="coverage-grid">
-            ${groups.map((group) => {
-                const target = targets[group.id] || 0;
-                const count = counts[group.id] || 0;
-                const status = target && count < target ? "low" : (target && count > target ? "high" : "ok");
-                return `
-                    <label class="coverage-item ${status}">
-                        <span>${escapeHtml(group.label)}</span>
-                        <input type="number" min="0" step="1" value="${target}" data-coverage-target="${group.id}" aria-label="${escapeHtml(group.label)} target">
-                        <small>${count}/${target || 0} scheduled</small>
-                    </label>
-                `;
-            }).join("")}
-        </div>
+        </details>
     `;
 }
 
@@ -1272,26 +1297,28 @@ function renderWeekBuilder() {
     });
 
     dom.weekBuilder.innerHTML = `
-        <div class="week-builder-head">
-            <div>
-                <p class="eyebrow">Weekly builder</p>
-                <h2>${escapeHtml(formatDateRange(week))}</h2>
+        <details class="week-drawer">
+            <summary>
+                <div>
+                    <p class="eyebrow">Weekly builder</p>
+                    <strong>${escapeHtml(formatDateRange(week))}</strong>
+                </div>
+                <span>Open week grid</span>
+            </summary>
+            <div class="week-builder-grid" style="grid-template-columns:${gridColumns}">
+                <div class="week-builder-corner"></div>
+                ${week.map((date) => {
+                    const dateKey = formatDate(date);
+                    return `
+                        <button class="week-builder-day ${dateKey === selectedDate ? "selected" : ""}" type="button" data-date="${dateKey}">
+                            <span>${escapeHtml(formatPrintWeekday(date))}</span>
+                            <strong>${date.getDate()}</strong>
+                        </button>
+                    `;
+                }).join("")}
+                ${rows.join("")}
             </div>
-            <span>Tap a day to edit it on the right.</span>
-        </div>
-        <div class="week-builder-grid" style="grid-template-columns:${gridColumns}">
-            <div class="week-builder-corner"></div>
-            ${week.map((date) => {
-                const dateKey = formatDate(date);
-                return `
-                    <button class="week-builder-day ${dateKey === selectedDate ? "selected" : ""}" type="button" data-date="${dateKey}">
-                        <span>${escapeHtml(formatPrintWeekday(date))}</span>
-                        <strong>${date.getDate()}</strong>
-                    </button>
-                `;
-            }).join("")}
-            ${rows.join("")}
-        </div>
+        </details>
     `;
 }
 

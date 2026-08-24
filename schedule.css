@@ -546,6 +546,74 @@ select:focus {
     gap: 0.5rem;
 }
 
+.tool-drawer,
+.bulk-drawer,
+.coverage-drawer,
+.week-drawer,
+.warning-drawer {
+    min-width: 0;
+}
+
+.tool-drawer > summary,
+.bulk-drawer > summary,
+.coverage-drawer > summary,
+.week-drawer > summary,
+.warning-drawer > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    min-height: 40px;
+    padding: 0.65rem 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 800;
+    list-style: none;
+}
+
+.tool-drawer > summary::-webkit-details-marker,
+.bulk-drawer > summary::-webkit-details-marker,
+.coverage-drawer > summary::-webkit-details-marker,
+.week-drawer > summary::-webkit-details-marker,
+.warning-drawer > summary::-webkit-details-marker {
+    display: none;
+}
+
+.tool-drawer > summary:hover,
+.bulk-drawer > summary:hover,
+.coverage-drawer > summary:hover,
+.week-drawer > summary:hover,
+.warning-drawer > summary:hover {
+    background: white;
+}
+
+.tool-drawer {
+    position: relative;
+}
+
+.tool-drawer-panel {
+    position: absolute;
+    top: calc(100% + 0.45rem);
+    right: 0;
+    z-index: 30;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(128px, 1fr));
+    gap: 0.45rem;
+    width: min(360px, 82vw);
+    padding: 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 14px 32px rgba(20, 23, 31, 0.14);
+}
+
+.tool-drawer-panel .secondary-button {
+    justify-content: flex-start;
+}
+
 .warning-list {
     display: grid;
     gap: 0.45rem;
@@ -553,6 +621,25 @@ select:focus {
 
 .warning-list:not(:empty) {
     margin-bottom: 1rem;
+}
+
+.warning-drawer > summary {
+    justify-content: flex-start;
+    border-color: rgba(255, 149, 0, 0.24);
+    background: rgba(255, 149, 0, 0.08);
+    color: #7a4300;
+}
+
+.warning-drawer > summary span {
+    color: inherit;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.warning-drawer-list {
+    display: grid;
+    gap: 0.45rem;
+    margin-top: 0.55rem;
 }
 
 .schedule-warning {
@@ -718,6 +805,30 @@ select:focus {
     border-top: 1px solid var(--line);
 }
 
+.week-drawer > summary {
+    background: rgba(255, 255, 255, 0.58);
+}
+
+.week-drawer > summary div,
+.coverage-drawer > summary div {
+    min-width: 0;
+}
+
+.week-drawer > summary strong,
+.coverage-drawer > summary strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+
+.week-drawer > summary span {
+    flex: 0 0 auto;
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
 .week-builder-head {
     display: flex;
     align-items: flex-end;
@@ -745,6 +856,10 @@ select:focus {
     border: 1px solid var(--line);
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.48);
+}
+
+.week-drawer .week-builder-grid {
+    margin-top: 0.65rem;
 }
 
 .week-builder-corner,
@@ -1054,29 +1169,25 @@ select:focus {
 }
 
 .coverage-panel {
-    display: grid;
-    gap: 0.65rem;
+    display: block;
     margin-bottom: 1rem;
-    padding: 0.75rem;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.5);
+    padding: 0;
+    border: 0;
+    background: transparent;
 }
 
-.coverage-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-
-.coverage-head h3 {
-    font-size: 1rem;
+.coverage-drawer > summary {
+    background: rgba(255, 255, 255, 0.58);
 }
 
 .coverage-grid {
     display: grid;
     gap: 0.5rem;
+    margin-top: 0.6rem;
+    padding: 0.65rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.45);
 }
 
 .coverage-item {
@@ -1300,12 +1411,12 @@ select:focus {
 
 .availability-builder {
     display: grid;
-    gap: 1rem;
-    padding: 1rem;
+    gap: 0.85rem;
+    padding: 0.9rem;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--surface);
-    box-shadow: 0 12px 36px rgba(20, 23, 31, 0.08);
+    box-shadow: 0 10px 28px rgba(20, 23, 31, 0.06);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
 }
@@ -1336,7 +1447,7 @@ select:focus {
 
 .builder-head h2 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.18rem;
     line-height: 1.12;
 }
 
@@ -1391,7 +1502,7 @@ select:focus {
 
 .availability-schedule-form {
     display: grid;
-    gap: 0.85rem;
+    gap: 0.7rem;
 }
 
 .builder-toolbar {
@@ -1422,6 +1533,30 @@ select:focus {
 
 .builder-shift-fields {
     grid-template-columns: minmax(150px, 1.15fr) minmax(150px, 1.15fr) repeat(2, minmax(110px, 0.7fr)) minmax(160px, 1fr) minmax(160px, 1fr);
+}
+
+.builder-shift-fields.compact {
+    grid-template-columns: minmax(160px, 1.25fr) minmax(150px, 1.15fr) repeat(2, minmax(110px, 0.75fr));
+}
+
+.bulk-drawer > summary {
+    justify-content: flex-start;
+    background: rgba(255, 255, 255, 0.58);
+    color: var(--muted);
+}
+
+.bulk-drawer-panel {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 0.65rem;
+    padding: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.48);
+}
+
+.builder-note-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .builder-selection-head {
@@ -1930,7 +2065,9 @@ svg {
     .form-grid,
     .segmented-control,
     .side-nav,
-    .builder-shift-fields {
+    .builder-shift-fields,
+    .builder-shift-fields.compact,
+    .builder-note-fields {
         grid-template-columns: 1fr;
     }
 
@@ -1939,6 +2076,22 @@ svg {
     .filter-tabs,
     .workflow-actions {
         justify-content: flex-start;
+    }
+
+    .tool-drawer,
+    .tool-drawer > summary,
+    .bulk-drawer > summary,
+    .coverage-drawer > summary,
+    .week-drawer > summary,
+    .warning-drawer > summary {
+        width: 100%;
+    }
+
+    .tool-drawer-panel {
+        position: static;
+        width: 100%;
+        grid-template-columns: 1fr;
+        margin-top: 0.45rem;
     }
 
     .week-builder-grid {
