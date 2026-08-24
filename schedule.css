@@ -389,6 +389,7 @@ select:focus {
     border-radius: 8px;
     background: var(--blue);
     color: white;
+    font-size: 0.82rem;
     font-weight: 800;
 }
 
@@ -761,6 +762,20 @@ select:focus {
     margin-bottom: 1rem;
 }
 
+.availability-group,
+.employee-group {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.group-label {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
 .availability-line {
     justify-content: space-between;
     gap: 0.8rem;
@@ -944,13 +959,44 @@ select:focus {
     font-weight: 800;
 }
 
+.matrix-group-row {
+    grid-column: 1 / -1;
+    min-height: 26px;
+    padding: 0.38rem 0.55rem;
+    border-radius: 6px;
+    background: rgba(157, 52, 72, 0.08);
+    color: var(--blue);
+    font-size: 0.68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
 .employees-layout {
     grid-template-columns: 340px minmax(0, 1fr);
     align-items: start;
 }
 
 .employee-list {
+    display: grid;
+    gap: 0.85rem;
     min-width: 0;
+}
+
+.employee-group {
+    padding: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.42);
+}
+
+.employee-group-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+    font-weight: 700;
 }
 
 .employee-row {
@@ -965,6 +1011,23 @@ select:focus {
 .employee-meta {
     min-width: 0;
     gap: 0.75rem;
+}
+
+.employee-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.category-select {
+    width: auto;
+    min-height: 32px;
+    max-width: 190px;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 700;
 }
 
 .employee-color {

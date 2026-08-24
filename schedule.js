@@ -4,6 +4,30 @@ const STORAGE_KEY = "portfolio2-scheduler-v1";
 const SESSION_KEY = "portfolio2-scheduler-session";
 const SYNC_ENDPOINT = "/api/scheduler";
 
+const managerAreas = {
+    foh: {
+        code: "FOH2026",
+        label: "Front of House",
+        shortLabel: "FOH",
+        title: "Front of House Schedule",
+        role: "Front of House manager"
+    },
+    boh: {
+        code: "BOH2026",
+        legacyCodes: ["MANAGER2026"],
+        label: "Back of House",
+        shortLabel: "BOH",
+        title: "Back of House Schedule",
+        role: "Kitchen manager"
+    }
+};
+
+const kitchenCategories = [
+    { id: "fulltime", label: "Permanent / full-time" },
+    { id: "parttime-cook", label: "Part-time cooks" },
+    { id: "dishwashing", label: "Dishwashing" }
+];
+
 const employeeColors = [
     "#007aff",
     "#34c759",
@@ -17,10 +41,14 @@ const employeeColors = [
 
 const stateTemplate = () => ({
     managerCode: "MANAGER2026",
+    managerCodes: {
+        foh: managerAreas.foh.code,
+        boh: managerAreas.boh.code
+    },
     employees: [
-        { id: "emp-alex", name: "Alex Morgan", role: "Front desk", code: "ALEX101", color: "#007aff" },
-        { id: "emp-mia", name: "Mia Chen", role: "Service", code: "MIA204", color: "#34c759" },
-        { id: "emp-noah", name: "Noah Pop", role: "Support", code: "NOAH315", color: "#ff9500" }
+        { id: "emp-alex", name: "Alex Morgan", role: "Chef", code: "ALEX101", color: "#007aff", area: "boh", category: "fulltime" },
+        { id: "emp-mia", name: "Mia Chen", role: "Part-time cook", code: "MIA204", color: "#34c759", area: "boh", category: "parttime-cook" },
+        { id: "emp-noah", name: "Noah Pop", role: "Dishwashing", code: "NOAH315", color: "#ff9500", area: "boh", category: "dishwashing" }
     ],
     availability: {},
     shifts: {}
@@ -104,6 +132,8 @@ function captureDom() {
         "employeeForm",
         "employeeName",
         "employeeRole",
+        "employeeCategoryGroup",
+        "employeeCategory",
         "employeeCode",
         "generateCodeBtn",
         "employeeFormMessage",
@@ -135,6 +165,7 @@ function bindEvents() {
     dom.employeeForm.addEventListener("submit", handleEmployeeSubmit);
     dom.generateCodeBtn.addEventListener("click", fillGeneratedEmployeeCode);
     dom.employeeList.addEventListener("click", handleEmployeeListClick);
+    dom.employeeList.addEventListener("change", handleEmployeeListChange);
     dom.dayShiftList.addEventListener("click", handleShiftListClick);
     window.addEventListener("afterprint", cleanupPdfExport);
     window.addEventListener("resize", updateScrollControls);
@@ -157,25 +188,45 @@ function loadState() {
     try {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (!stored || !Array.isArray(stored.employees)) return stateTemplate();
-        return {
-            ...stateTemplate(),
-            ...stored,
-            availability: stored.availability || {},
-            shifts: stored.shifts || {}
-        };
+        return stored;
     } catch (error) {
         return stateTemplate();
     }
 }
 
 function normalizeState(nextState) {
+    const template = stateTemplate();
     return {
-        ...stateTemplate(),
+        ...template,
         ...(nextState || {}),
-        employees: Array.isArray(nextState && nextState.employees) ? nextState.employees : stateTemplate().employees,
+        managerCodes: {
+            ...template.managerCodes,
+            ...((nextState && nextState.managerCodes) || {})
+        },
+        employees: Array.isArray(nextState && nextState.employees)
+            ? nextState.employees.map(normalizeEmployee)
+            : template.employees.map(normalizeEmployee),
         availability: nextState && nextState.availability ? nextState.availability : {},
         shifts: nextState && nextState.shifts ? nextState.shifts : {}
     };
+}
+
+function normalizeEmployee(employee) {
+    employee = employee || {};
+    const area = employee && managerAreas[employee.area] ? employee.area : "boh";
+    const category = area === "boh" && isKitchenCategory(employee && employee.category)
+        ? employee.category
+        : (area === "boh" ? "parttime-cook" : "front-of-house");
+
+    return {
+        ...employee,
+        area,
+        category
+    };
+}
+
+function isKitchenCategory(category) {
+    return kitchenCategories.some((item) => item.id === category);
 }
 
 function saveState(options = {}) {
@@ -188,7 +239,12 @@ function loadSession() {
     try {
         const session = JSON.parse(sessionStorage.getItem(SESSION_KEY));
         if (!session) return null;
-        if (session.type === "manager") return session;
+        if (session.type === "manager") {
+            return {
+                type: "manager",
+                area: managerAreas[session.area] ? session.area : "boh"
+            };
+        }
         const employee = state.employees.find((item) => item.id === session.employeeId);
         return employee ? { type: "employee", employeeId: employee.id } : null;
     } catch (error) {
@@ -204,13 +260,89 @@ function saveSession() {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
 }
 
+function getManagerByCode(code) {
+    return Object.entries(managerAreas).map(([area, config]) => {
+        const configuredCode = state.managerCodes && state.managerCodes[area] ? state.managerCodes[area] : config.code;
+        const validCodes = [configuredCode, config.code, ...(config.legacyCodes || [])];
+        if (area === "boh") validCodes.push(state.managerCode);
+        return validCodes.some((item) => normalizeCode(item) === code) ? { area, ...config } : null;
+    }).find(Boolean);
+}
+
+function isManagerCode(code) {
+    return Boolean(getManagerByCode(normalizeCode(code)));
+}
+
+function getCurrentManagerArea() {
+    if (!currentUser || currentUser.type !== "manager") return "boh";
+    return managerAreas[currentUser.area] ? currentUser.area : "boh";
+}
+
+function getCurrentManagerConfig() {
+    const area = getCurrentManagerArea();
+    return { area, ...managerAreas[area] };
+}
+
+function getEmployeeArea(employee) {
+    return employee && managerAreas[employee.area] ? employee.area : "boh";
+}
+
+function getEmployeeCategory(employee) {
+    if (getEmployeeArea(employee) !== "boh") return "front-of-house";
+    return isKitchenCategory(employee && employee.category) ? employee.category : "parttime-cook";
+}
+
+function getManagerEmployees() {
+    const area = getCurrentManagerArea();
+    return getSortedEmployees(state.employees.filter((employee) => getEmployeeArea(employee) === area), area);
+}
+
+function getSortedEmployees(employees, area = "boh") {
+    const categoryRank = new Map(kitchenCategories.map((category, index) => [category.id, index]));
+    return [...employees].sort((first, second) => {
+        if (area === "boh") {
+            const firstRank = categoryRank.get(getEmployeeCategory(first)) ?? kitchenCategories.length;
+            const secondRank = categoryRank.get(getEmployeeCategory(second)) ?? kitchenCategories.length;
+            if (firstRank !== secondRank) return firstRank - secondRank;
+        }
+        return first.name.localeCompare(second.name);
+    });
+}
+
+function getGroupedEmployees(employees, area = "boh") {
+    if (area !== "boh") {
+        return [{ id: "foh", label: "Front of House", employees: getSortedEmployees(employees, area) }];
+    }
+
+    return kitchenCategories.map((category) => ({
+        ...category,
+        employees: employees.filter((employee) => getEmployeeCategory(employee) === category.id)
+    }));
+}
+
+function employeeCategoryLabel(employee) {
+    if (getEmployeeArea(employee) !== "boh") return "Front of House";
+    return (kitchenCategories.find((category) => category.id === getEmployeeCategory(employee)) || kitchenCategories[1]).label;
+}
+
+function renderEmployeeCategorySelect(employee) {
+    return `
+        <select class="category-select" data-action="change-category" data-id="${employee.id}" aria-label="Category for ${escapeHtml(employee.name)}">
+            ${kitchenCategories.map((category) => `
+                <option value="${category.id}" ${getEmployeeCategory(employee) === category.id ? "selected" : ""}>${escapeHtml(category.label)}</option>
+            `).join("")}
+        </select>
+    `;
+}
+
 function handleLogin(event) {
     event.preventDefault();
     const code = normalizeCode(dom.accessCode.value);
+    const manager = getManagerByCode(code);
     const employee = state.employees.find((item) => normalizeCode(item.code) === code);
 
-    if (code === normalizeCode(state.managerCode)) {
-        currentUser = { type: "manager" };
+    if (manager) {
+        currentUser = { type: "manager", area: manager.area };
         activeView = "schedule";
     } else if (employee) {
         currentUser = { type: "employee", employeeId: employee.id };
@@ -340,11 +472,12 @@ function renderSyncStatus() {
 
 function updateSessionUi() {
     if (currentUser.type === "manager") {
-        dom.profileAvatar.textContent = "M";
+        const manager = getCurrentManagerConfig();
+        dom.profileAvatar.textContent = manager.shortLabel;
         dom.profileAvatar.style.background = "#1d1d1f";
-        dom.profileName.textContent = "Manager";
-        dom.profileRole.textContent = "Kitchen schedule manager";
-        dom.sessionPill.textContent = "Manager";
+        dom.profileName.textContent = manager.label;
+        dom.profileRole.textContent = manager.role;
+        dom.sessionPill.textContent = manager.shortLabel;
         return;
     }
 
@@ -381,11 +514,13 @@ function renderActiveView() {
         element.hidden = name !== activeView;
     });
 
+    const manager = currentUser.type === "manager" ? getCurrentManagerConfig() : null;
+    const managerTitle = manager ? manager.title : "Kitchen Schedule";
     const titles = {
-        schedule: ["Oak34", "Kitchen Schedule"],
+        schedule: [manager ? manager.label : "Oak34", managerTitle],
         employeeAvailability: ["Oak34", "My Month"],
-        managerAvailability: ["Oak34", "Availability"],
-        employees: ["Oak34", "Employees"]
+        managerAvailability: [manager ? manager.label : "Oak34", "Availability"],
+        employees: [manager ? manager.label : "Oak34", "Employees"]
     };
     const [eyebrow, title] = titles[activeView] || titles.schedule;
     dom.surfaceEyebrow.textContent = eyebrow;
@@ -408,11 +543,12 @@ function setActiveView(view) {
 }
 
 function renderPrintHeading() {
+    const manager = currentUser && currentUser.type === "manager" ? getCurrentManagerConfig() : null;
     const titleMap = {
-        schedule: "Oak34 Kitchen Schedule",
+        schedule: manager ? `Oak34 ${manager.label} Schedule` : "Oak34 Kitchen Schedule",
         employeeAvailability: "Oak34 Kitchen Schedule",
-        managerAvailability: "Oak34 Kitchen Availability",
-        employees: "Oak34 Kitchen Team"
+        managerAvailability: manager ? `Oak34 ${manager.label} Availability` : "Oak34 Kitchen Availability",
+        employees: manager ? `Oak34 ${manager.label} Team` : "Oak34 Kitchen Team"
     };
     dom.printHeading.textContent = `${titleMap[activeView] || "Calendar"} - ${monthTitle(currentMonth)}`;
 }
@@ -529,7 +665,7 @@ function renderCalendar(container, mode) {
 }
 
 function renderAvailabilityDots(dateKey) {
-    const summary = getAvailabilitySummary(dateKey);
+    const summary = getAvailabilitySummary(dateKey, getManagerEmployees());
     const dots = [];
     if (summary.available) dots.push(`<b class="dot available" title="${summary.available} available"></b>`);
     if (summary.maybe) dots.push(`<b class="dot maybe" title="${summary.maybe} maybe"></b>`);
@@ -545,7 +681,8 @@ function renderEmployeeStatusBadge(dateKey) {
 }
 
 function renderShiftPills(dateKey) {
-    const shifts = state.shifts[dateKey] || [];
+    const visibleEmployeeIds = new Set(getManagerEmployees().map((employee) => employee.id));
+    const shifts = (state.shifts[dateKey] || []).filter((shift) => visibleEmployeeIds.has(shift.employeeId));
     const visible = shifts.slice(0, 2).map((shift) => {
         const employee = getEmployee(shift.employeeId);
         const color = employee ? employee.color : "#8e8e93";
@@ -571,26 +708,33 @@ function renderEmployeeShiftPills(dateKey) {
 }
 
 function renderShiftEmployeeOptions() {
-    if (!state.employees.length) {
+    const employees = getManagerEmployees();
+    if (!employees.length) {
         dom.shiftEmployee.innerHTML = `<option value="">No employees yet</option>`;
         dom.shiftForm.querySelector(".primary-button").disabled = true;
         return;
     }
 
-    dom.shiftEmployee.innerHTML = state.employees.map((employee) => (
-        `<option value="${employee.id}">${escapeHtml(employee.name)}</option>`
-    )).join("");
+    const manager = getCurrentManagerConfig();
+    const groups = getGroupedEmployees(employees, manager.area).filter((group) => group.employees.length);
+    dom.shiftEmployee.innerHTML = groups.map((group) => `
+        <optgroup label="${escapeHtml(group.label)}">
+            ${group.employees.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)}</option>`).join("")}
+        </optgroup>
+    `).join("");
     dom.shiftForm.querySelector(".primary-button").disabled = false;
 }
 
 function renderManagerHoursSummary() {
-    if (!state.employees.length) {
+    const employees = getManagerEmployees();
+    if (!employees.length) {
         dom.managerHoursSummary.innerHTML = `<p class="empty-state">No employees have been added yet.</p>`;
         requestAnimationFrame(updateHoursScrollControls);
         return;
     }
 
-    const totals = getMonthlyHoursByEmployee(currentMonth);
+    const manager = getCurrentManagerConfig();
+    const totals = getMonthlyHoursByEmployee(currentMonth, employees);
     const teamMinutes = totals.reduce((sum, item) => sum + item.minutes, 0);
     const teamShifts = totals.reduce((sum, item) => sum + item.shifts, 0);
     const cards = [
@@ -598,7 +742,7 @@ function renderManagerHoursSummary() {
             <div class="hours-card total">
                 <span class="hours-name">Team total</span>
                 <span class="hours-value">${formatHours(teamMinutes)}</span>
-                <span class="hours-detail">${teamShifts} scheduled ${teamShifts === 1 ? "shift" : "shifts"}</span>
+                <span class="hours-detail">${escapeHtml(manager.shortLabel)} ${teamShifts} scheduled ${teamShifts === 1 ? "shift" : "shifts"}</span>
             </div>
         `,
         ...totals.map(({ employee, minutes, shifts }) => `
@@ -625,31 +769,41 @@ function renderEmployeeHoursSummary(employeeId) {
 }
 
 function renderManagerDayAvailability() {
-    if (!state.employees.length) {
+    const employees = getManagerEmployees();
+    if (!employees.length) {
         dom.managerDayAvailability.innerHTML = `<p class="empty-state">No employees have been added yet.</p>`;
         return;
     }
 
-    dom.managerDayAvailability.innerHTML = state.employees.map((employee) => {
-        const availability = getAvailability(employee.id, selectedDate);
-        const status = availability ? availability.status : "none";
-        const detail = availability
-            ? `${statusLabel(status)}${availability.start && availability.end ? `, ${availability.start}-${availability.end}` : ""}`
-            : "No availability added";
-        return `
-            <div class="availability-line">
-                <div>
-                    <div class="availability-name">${escapeHtml(employee.name)}</div>
-                    <div class="availability-detail">${escapeHtml(detail)}</div>
-                </div>
-                ${availability ? `<b class="dot ${status}"></b>` : `<b class="dot"></b>`}
+    const manager = getCurrentManagerConfig();
+    dom.managerDayAvailability.innerHTML = getGroupedEmployees(employees, manager.area)
+        .filter((group) => group.employees.length)
+        .map((group) => `
+            <div class="availability-group">
+                <p class="group-label">${escapeHtml(group.label)}</p>
+                ${group.employees.map((employee) => {
+                    const availability = getAvailability(employee.id, selectedDate);
+                    const status = availability ? availability.status : "none";
+                    const detail = availability
+                        ? `${statusLabel(status)}${availability.start && availability.end ? `, ${availability.start}-${availability.end}` : ""}`
+                        : "No availability added";
+                    return `
+                        <div class="availability-line">
+                            <div>
+                                <div class="availability-name">${escapeHtml(employee.name)}</div>
+                                <div class="availability-detail">${escapeHtml(detail)}</div>
+                            </div>
+                            ${availability ? `<b class="dot ${status}"></b>` : `<b class="dot"></b>`}
+                        </div>
+                    `;
+                }).join("")}
             </div>
-        `;
-    }).join("");
+        `).join("");
 }
 
 function renderDayShifts() {
-    const shifts = state.shifts[selectedDate] || [];
+    const visibleEmployeeIds = new Set(getManagerEmployees().map((employee) => employee.id));
+    const shifts = (state.shifts[selectedDate] || []).filter((shift) => visibleEmployeeIds.has(shift.employeeId));
     if (!shifts.length) {
         dom.dayShiftList.innerHTML = `<p class="empty-state">No shifts for this day.</p>`;
         return;
@@ -702,6 +856,8 @@ function renderEmployeeDayShifts(employeeId) {
 
 function renderAvailabilityMatrix() {
     const days = getMonthDates(currentMonth);
+    const manager = getCurrentManagerConfig();
+    const employees = getManagerEmployees();
     const daySize = document.body.classList.contains("pdf-exporting") ? 22 : 28;
     const nameSize = document.body.classList.contains("pdf-exporting") ? 126 : 176;
     dom.availabilityMatrix.style.gridTemplateColumns = `${nameSize}px repeat(${days.length}, ${daySize}px)`;
@@ -715,42 +871,69 @@ function renderAvailabilityMatrix() {
         `)
     ];
 
-    const rows = state.employees.flatMap((employee) => [
-        `<div class="matrix-employee">${escapeHtml(employee.name)}</div>`,
-        ...days.map((date) => {
-            const availability = getAvailability(employee.id, formatDate(date));
-            const label = availability ? statusShort(availability.status) : "";
-            const title = availability ? `${employee.name}: ${statusLabel(availability.status)}` : `${employee.name}: no entry`;
-            return `<div class="matrix-cell ${availability ? availability.status : ""}" title="${escapeHtml(title)}">${label}</div>`;
-        })
-    ]);
+    const rows = getGroupedEmployees(employees, manager.area).flatMap((group) => {
+        if (!group.employees.length) return [];
+        return [
+            `<div class="matrix-group-row">${escapeHtml(group.label)}</div>`,
+            ...group.employees.flatMap((employee) => [
+                `<div class="matrix-employee">${escapeHtml(employee.name)}</div>`,
+                ...days.map((date) => {
+                    const availability = getAvailability(employee.id, formatDate(date));
+                    const label = availability ? statusShort(availability.status) : "";
+                    const title = availability ? `${employee.name}: ${statusLabel(availability.status)}` : `${employee.name}: no entry`;
+                    return `<div class="matrix-cell ${availability ? availability.status : ""}" title="${escapeHtml(title)}">${label}</div>`;
+                })
+            ])
+        ];
+    });
 
-    dom.availabilityMatrix.innerHTML = state.employees.length
+    dom.availabilityMatrix.innerHTML = employees.length
         ? [...header, ...rows].join("")
         : `<p class="empty-state">No employees have been added yet.</p>`;
     requestAnimationFrame(updateAvailabilityScrollControls);
 }
 
 function renderEmployees() {
-    dom.employeeList.innerHTML = state.employees.length
-        ? state.employees.map((employee) => {
-            const minutes = getEmployeeMonthlyMinutes(employee.id, currentMonth);
-            const shifts = getEmployeeMonthlyShiftCount(employee.id, currentMonth);
+    const manager = getCurrentManagerConfig();
+    const employees = getManagerEmployees();
+    dom.employeeCategoryGroup.hidden = manager.area !== "boh";
+    dom.employeeCategory.required = manager.area === "boh";
+    dom.employeeForm.querySelector("h2").textContent = `Add ${manager.label} employee`;
+    dom.employeeForm.querySelector(".eyebrow").textContent = manager.shortLabel;
+
+    dom.employeeList.innerHTML = employees.length
+        ? getGroupedEmployees(employees, manager.area).map((group) => {
+            if (!group.employees.length) return "";
             return `
-                <div class="employee-row">
-                    <div class="employee-meta">
-                        <span class="employee-color" style="background:${employee.color}"></span>
-                        <div>
-                            <p class="employee-name">${escapeHtml(employee.name)}</p>
-                            <p class="employee-sub">${escapeHtml(employee.role || "Employee")}</p>
-                            <p class="employee-hours">${formatHours(minutes)} this month, ${shifts} ${shifts === 1 ? "shift" : "shifts"}</p>
-                        </div>
+                <section class="employee-group">
+                    <div class="employee-group-head">
+                        <p class="group-label">${escapeHtml(group.label)}</p>
+                        <span>${group.employees.length} ${group.employees.length === 1 ? "employee" : "employees"}</span>
                     </div>
-                    <span class="code-chip">${escapeHtml(employee.code)}</span>
-                    <button class="danger-button" type="button" data-action="remove-employee" data-id="${employee.id}" aria-label="Remove ${escapeHtml(employee.name)}" title="Remove employee">
-                        <i data-lucide="user-minus"></i>
-                    </button>
-                </div>
+                    ${group.employees.map((employee) => {
+                        const minutes = getEmployeeMonthlyMinutes(employee.id, currentMonth);
+                        const shifts = getEmployeeMonthlyShiftCount(employee.id, currentMonth);
+                        return `
+                            <div class="employee-row">
+                                <div class="employee-meta">
+                                    <span class="employee-color" style="background:${employee.color}"></span>
+                                    <div>
+                                        <p class="employee-name">${escapeHtml(employee.name)}</p>
+                                        <p class="employee-sub">${escapeHtml(employee.role || employeeCategoryLabel(employee))}</p>
+                                        <p class="employee-hours">${formatHours(minutes)} this month, ${shifts} ${shifts === 1 ? "shift" : "shifts"}</p>
+                                    </div>
+                                </div>
+                                <div class="employee-actions">
+                                    ${manager.area === "boh" ? renderEmployeeCategorySelect(employee) : ""}
+                                    <span class="code-chip">${escapeHtml(employee.code)}</span>
+                                    <button class="danger-button" type="button" data-action="remove-employee" data-id="${employee.id}" aria-label="Remove ${escapeHtml(employee.name)}" title="Remove employee">
+                                        <i data-lucide="user-minus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
+                </section>
             `;
         }).join("")
         : `<p class="empty-state">No employees have been added yet.</p>`;
@@ -825,12 +1008,17 @@ function clearAvailability() {
 
 function handleEmployeeSubmit(event) {
     event.preventDefault();
+    const manager = getCurrentManagerConfig();
     const name = dom.employeeName.value.trim();
     const role = dom.employeeRole.value.trim();
     const code = normalizeCode(dom.employeeCode.value || generateEmployeeCode(name));
+    const area = manager.area;
+    const category = area === "boh" && isKitchenCategory(dom.employeeCategory.value)
+        ? dom.employeeCategory.value
+        : "front-of-house";
 
     if (!name) return;
-    if (code === normalizeCode(state.managerCode) || state.employees.some((employee) => normalizeCode(employee.code) === code)) {
+    if (isManagerCode(code) || state.employees.some((employee) => normalizeCode(employee.code) === code)) {
         dom.employeeFormMessage.textContent = "That access code is already in use.";
         return;
     }
@@ -840,7 +1028,9 @@ function handleEmployeeSubmit(event) {
         name,
         role,
         code,
-        color: employeeColors[state.employees.length % employeeColors.length]
+        color: employeeColors[state.employees.length % employeeColors.length],
+        area,
+        category
     };
 
     state.employees.push(employee);
@@ -858,6 +1048,18 @@ function handleEmployeeListClick(event) {
     const button = event.target.closest("[data-action='remove-employee']");
     if (!button) return;
     removeEmployee(button.dataset.id);
+}
+
+function handleEmployeeListChange(event) {
+    const select = event.target.closest("[data-action='change-category']");
+    if (!select || !isKitchenCategory(select.value)) return;
+    const employee = getEmployee(select.dataset.id);
+    if (!employee) return;
+
+    employee.area = "boh";
+    employee.category = select.value;
+    saveState();
+    renderEmployees();
 }
 
 function removeEmployee(employeeId) {
@@ -903,16 +1105,16 @@ function getAvailability(employeeId, dateKey) {
     return state.availability[employeeId] ? state.availability[employeeId][dateKey] : null;
 }
 
-function getAvailabilitySummary(dateKey) {
-    return state.employees.reduce((summary, employee) => {
+function getAvailabilitySummary(dateKey, employees = state.employees) {
+    return employees.reduce((summary, employee) => {
         const availability = getAvailability(employee.id, dateKey);
         if (availability) summary[availability.status] += 1;
         return summary;
     }, { available: 0, maybe: 0, unavailable: 0 });
 }
 
-function getMonthlyHoursByEmployee(monthDate) {
-    return state.employees.map((employee) => ({
+function getMonthlyHoursByEmployee(monthDate, employees = state.employees) {
+    return employees.map((employee) => ({
         employee,
         minutes: getEmployeeMonthlyMinutes(employee.id, monthDate),
         shifts: getEmployeeMonthlyShiftCount(employee.id, monthDate)
@@ -1018,7 +1220,7 @@ function generateEmployeeCode(name) {
     let code = "";
     do {
         code = `${prefix}${Math.floor(100 + Math.random() * 900)}`;
-    } while (code === normalizeCode(state.managerCode) || state.employees.some((employee) => normalizeCode(employee.code) === code));
+    } while (isManagerCode(code) || state.employees.some((employee) => normalizeCode(employee.code) === code));
     return code;
 }
 
