@@ -118,6 +118,7 @@ function captureDom() {
         "shiftStart",
         "shiftEnd",
         "shiftNote",
+        "shiftFormMessage",
         "dayShiftList",
         "availabilityForm",
         "availableStart",
@@ -615,6 +616,7 @@ function renderManagerSchedule() {
     renderManagerHoursSummary();
     renderCalendar(dom.managerCalendarGrid, "manager");
     dom.managerSelectedDate.textContent = longDate(selectedDate);
+    dom.shiftFormMessage.textContent = "";
     renderShiftEmployeeOptions();
     renderManagerDayAvailability();
     renderDayShifts();
@@ -709,8 +711,11 @@ function renderEmployeeShiftPills(dateKey) {
 
 function renderShiftEmployeeOptions() {
     const employees = getManagerEmployees();
+    const bookedEmployeeIds = new Set((state.shifts[selectedDate] || []).map((shift) => shift.employeeId));
+    const firstAvailableEmployee = employees.find((employee) => !bookedEmployeeIds.has(employee.id));
     if (!employees.length) {
         dom.shiftEmployee.innerHTML = `<option value="">No employees yet</option>`;
+        dom.shiftEmployee.disabled = true;
         dom.shiftForm.querySelector(".primary-button").disabled = true;
         return;
     }
@@ -719,10 +724,16 @@ function renderShiftEmployeeOptions() {
     const groups = getGroupedEmployees(employees, manager.area).filter((group) => group.employees.length);
     dom.shiftEmployee.innerHTML = groups.map((group) => `
         <optgroup label="${escapeHtml(group.label)}">
-            ${group.employees.map((employee) => `<option value="${employee.id}">${escapeHtml(employee.name)}</option>`).join("")}
+            ${group.employees.map((employee) => {
+                const isBooked = bookedEmployeeIds.has(employee.id);
+                const optionLabel = isBooked ? `${employee.name} - already scheduled` : employee.name;
+                return `<option value="${employee.id}" ${isBooked ? "disabled" : ""}>${escapeHtml(optionLabel)}</option>`;
+            }).join("")}
         </optgroup>
     `).join("");
-    dom.shiftForm.querySelector(".primary-button").disabled = false;
+    dom.shiftEmployee.value = firstAvailableEmployee ? firstAvailableEmployee.id : "";
+    dom.shiftEmployee.disabled = !firstAvailableEmployee;
+    dom.shiftForm.querySelector(".primary-button").disabled = !firstAvailableEmployee;
 }
 
 function renderManagerHoursSummary() {
@@ -956,6 +967,14 @@ function handleShiftSubmit(event) {
     event.preventDefault();
     const employeeId = dom.shiftEmployee.value;
     if (!employeeId) return;
+    dom.shiftFormMessage.textContent = "";
+
+    if (hasEmployeeShiftOnDate(employeeId, selectedDate)) {
+        const employee = getEmployee(employeeId);
+        dom.shiftFormMessage.textContent = `${employee ? employee.name : "This employee"} already has a shift on ${longDate(selectedDate)}.`;
+        renderShiftEmployeeOptions();
+        return;
+    }
 
     const shift = {
         id: `shift-${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -969,6 +988,7 @@ function handleShiftSubmit(event) {
     state.shifts[selectedDate] = [...(state.shifts[selectedDate] || []), shift];
     saveState();
     dom.shiftNote.value = "";
+    dom.shiftFormMessage.textContent = "";
     renderManagerSchedule();
 }
 
@@ -1103,6 +1123,10 @@ function getEmployee(employeeId) {
 
 function getAvailability(employeeId, dateKey) {
     return state.availability[employeeId] ? state.availability[employeeId][dateKey] : null;
+}
+
+function hasEmployeeShiftOnDate(employeeId, dateKey) {
+    return (state.shifts[dateKey] || []).some((shift) => shift.employeeId === employeeId);
 }
 
 function getAvailabilitySummary(dateKey, employees = state.employees) {
