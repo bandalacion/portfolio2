@@ -799,6 +799,196 @@ select:focus {
     gap: 0.35rem;
 }
 
+.schedule-matrix-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.schedule-matrix-head h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    line-height: 1.12;
+}
+
+.schedule-matrix-head > div > span {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.schedule-matrix-wrap {
+    max-width: 100%;
+    max-height: min(68vh, 760px);
+    overflow: auto;
+    padding: 0.65rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.48);
+    overscroll-behavior-inline: contain;
+    scrollbar-gutter: stable both-edges;
+}
+
+.schedule-matrix {
+    display: grid;
+    width: max-content;
+    gap: 0.18rem;
+    align-items: center;
+}
+
+.schedule-matrix-corner,
+.schedule-matrix-day,
+.schedule-matrix-name,
+.schedule-check-cell {
+    min-height: 44px;
+    border-radius: 6px;
+}
+
+.schedule-matrix-corner,
+.schedule-matrix-day {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+}
+
+.schedule-matrix-corner {
+    left: 0;
+    z-index: 5;
+    background: rgba(255, 255, 255, 0.96);
+}
+
+.schedule-matrix-day {
+    display: grid;
+    place-items: center;
+    gap: 0.04rem;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.9);
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 900;
+}
+
+.schedule-matrix-day span {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.58rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.schedule-matrix-day.selected {
+    border-color: rgba(157, 52, 72, 0.62);
+    background: rgba(157, 52, 72, 0.1);
+    color: var(--blue);
+}
+
+.schedule-matrix-group {
+    grid-column: 1 / -1;
+    min-height: 28px;
+    padding: 0.44rem 0.55rem;
+    border-radius: 6px;
+    background: rgba(157, 52, 72, 0.08);
+    color: var(--blue);
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.schedule-matrix-name {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    display: grid;
+    align-content: center;
+    gap: 0.12rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 8px 0 18px rgba(245, 245, 247, 0.9);
+}
+
+.schedule-matrix-name strong,
+.schedule-matrix-name span,
+.schedule-check-cell small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.schedule-matrix-name strong {
+    font-size: 0.78rem;
+    font-weight: 900;
+}
+
+.schedule-matrix-name span {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.68rem;
+    font-weight: 800;
+}
+
+.schedule-check-cell {
+    display: grid;
+    place-items: center;
+    gap: 0.14rem;
+    padding: 0.32rem;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.68);
+    cursor: pointer;
+}
+
+.schedule-check-cell.available {
+    border-color: rgba(52, 199, 89, 0.3);
+    background: rgba(52, 199, 89, 0.12);
+}
+
+.schedule-check-cell.maybe {
+    border-color: rgba(255, 149, 0, 0.32);
+    background: rgba(255, 149, 0, 0.12);
+}
+
+.schedule-check-cell.unavailable {
+    border-color: rgba(255, 59, 48, 0.28);
+    background: rgba(255, 59, 48, 0.1);
+    color: var(--red);
+}
+
+.schedule-check-cell.scheduled {
+    border-color: rgba(157, 52, 72, 0.4);
+    background: rgba(157, 52, 72, 0.13);
+    color: var(--blue);
+}
+
+.schedule-check-cell.selected-column {
+    box-shadow: inset 0 0 0 2px rgba(157, 52, 72, 0.28);
+}
+
+.schedule-check-cell.disabled {
+    cursor: not-allowed;
+    opacity: 0.72;
+}
+
+.schedule-check-cell input {
+    width: 16px;
+    min-height: 16px;
+    accent-color: var(--blue);
+}
+
+.schedule-checkmark {
+    display: none;
+}
+
+.schedule-check-cell small {
+    max-width: 100%;
+    color: currentColor;
+    font-size: 0.58rem;
+    font-weight: 900;
+}
+
 .week-builder {
     margin-top: 1rem;
     padding-top: 1rem;
@@ -1081,6 +1271,10 @@ select:focus {
 .status-badge.unavailable,
 .matrix-cell.unavailable {
     background: var(--red);
+}
+
+.dot.scheduled {
+    background: var(--blue);
 }
 
 .status-badge {
@@ -2014,6 +2208,7 @@ svg {
     .builder-head,
     .builder-toolbar,
     .workflow-strip,
+    .schedule-matrix-head,
     .week-builder-head {
         display: grid;
     }
@@ -2098,6 +2293,10 @@ svg {
         max-height: 420px;
     }
 
+    .schedule-matrix-wrap {
+        padding: 0.45rem;
+    }
+
     .builder-person {
         align-items: flex-start;
     }
@@ -2146,6 +2345,8 @@ svg {
     .workflow-strip,
     .warning-list,
     .week-builder,
+    .schedule-matrix-head,
+    .schedule-matrix-wrap,
     .coverage-panel {
         display: none !important;
     }
@@ -2348,8 +2549,77 @@ svg {
         font-size: 10pt;
     }
 
+    .print-month-calendar {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 1.2mm;
+    }
+
+    .print-month-weekday {
+        padding: 1.2mm;
+        background: #f5f5f7;
+        color: #6e6e73;
+        font-size: 6.5pt;
+        font-weight: 900;
+        text-align: center;
+        text-transform: uppercase;
+    }
+
+    .print-month-cell {
+        min-height: 24mm;
+        padding: 1.2mm;
+        border: 1px solid #d8d8dc;
+        background: #ffffff;
+        break-inside: avoid;
+    }
+
+    .print-month-date {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1mm;
+        margin-bottom: 1mm;
+    }
+
+    .print-month-date span {
+        font-size: 8pt;
+        font-weight: 900;
+    }
+
+    .print-month-date strong {
+        min-width: 5mm;
+        padding: 0.4mm 1mm;
+        border-radius: 999px;
+        background: rgba(157, 52, 72, 0.12);
+        color: #9d3448;
+        font-size: 6pt;
+        text-align: center;
+    }
+
+    .print-month-shifts {
+        display: grid;
+        gap: 0.8mm;
+    }
+
+    .print-month-shifts span,
+    .print-month-shifts small {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #4f4f55;
+        font-size: 5.7pt;
+        font-weight: 700;
+        line-height: 1.08;
+    }
+
+    .print-month-shifts b {
+        color: #1d1d1f;
+        font-weight: 900;
+    }
+
     .print-schedule-table,
     .print-totals-table,
+    .print-shift-grid-table,
     .print-coverage-table,
     .print-availability-table {
         width: 100%;
@@ -2361,6 +2631,8 @@ svg {
     .print-schedule-table td,
     .print-totals-table th,
     .print-totals-table td,
+    .print-shift-grid-table th,
+    .print-shift-grid-table td,
     .print-coverage-table th,
     .print-coverage-table td,
     .print-availability-table th,
@@ -2493,6 +2765,8 @@ svg {
 
     .print-totals-table th,
     .print-totals-table td,
+    .print-shift-grid-table th,
+    .print-shift-grid-table td,
     .print-coverage-table th,
     .print-coverage-table td {
         padding: 1.45mm 1.8mm;
@@ -2501,6 +2775,7 @@ svg {
     }
 
     .print-totals-table thead th,
+    .print-shift-grid-table thead th,
     .print-coverage-table thead th {
         background: #f5f5f7;
         color: #6e6e73;
@@ -2510,8 +2785,25 @@ svg {
     }
 
     .print-totals-table tbody th,
+    .print-shift-grid-table tbody th,
     .print-coverage-table tbody th {
         font-weight: 900;
+    }
+
+    .print-shift-grid-table th:nth-child(1),
+    .print-shift-grid-table td:nth-child(1) {
+        width: 20mm;
+    }
+
+    .print-shift-grid-table th:nth-child(2),
+    .print-shift-grid-table td:nth-child(2),
+    .print-shift-grid-table th:nth-child(6),
+    .print-shift-grid-table td:nth-child(6),
+    .print-shift-grid-table th:nth-child(7),
+    .print-shift-grid-table td:nth-child(7),
+    .print-shift-grid-table th:nth-child(8),
+    .print-shift-grid-table td:nth-child(8) {
+        width: 14mm;
     }
 
     .print-coverage-table {

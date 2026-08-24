@@ -164,9 +164,22 @@
                             <i data-lucide="chevron-right"></i>
                         </button>
                     </div>
-                    <div class="weekday-row" id="managerWeekdays"></div>
-                    <div class="month-grid" id="managerCalendarGrid"></div>
-                    <div class="week-builder" id="weekBuilder"></div>
+                    <div class="schedule-matrix-head">
+                        <div>
+                            <p class="eyebrow">Monthly builder</p>
+                            <h2>Availability schedule grid</h2>
+                            <span>Tick a cell to add a shift. Untick it to remove the shift.</span>
+                        </div>
+                        <div class="legend">
+                            <span><b class="dot available"></b>Available</span>
+                            <span><b class="dot maybe"></b>Maybe</span>
+                            <span><b class="dot unavailable"></b>Unavailable</span>
+                            <span><b class="dot scheduled"></b>Scheduled</span>
+                        </div>
+                    </div>
+                    <div class="schedule-matrix-wrap" id="scheduleMatrixWrap">
+                        <div class="schedule-matrix" id="scheduleMatrix"></div>
+                    </div>
                 </div>
                 <aside class="day-panel">
                     <div class="panel-heading">
