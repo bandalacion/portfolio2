@@ -594,6 +594,11 @@ select:focus {
     gap: 0.5rem;
 }
 
+body.manager-schedule-view #prevMonthBtn,
+body.manager-schedule-view #nextMonthBtn {
+    display: none;
+}
+
 .export-mode {
     display: inline-flex;
     align-items: center;
@@ -1054,6 +1059,36 @@ select:focus {
     background: rgba(255, 255, 255, 0.96);
 }
 
+.schedule-week-corner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+}
+
+.schedule-week-corner span {
+    color: var(--muted);
+    font-size: 0.64rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.schedule-week-grid-btn {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+    min-height: 32px;
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.94);
+    color: var(--blue);
+    box-shadow: 0 6px 18px rgba(20, 23, 31, 0.08);
+}
+
+.schedule-week-grid-btn svg {
+    width: 17px;
+    height: 17px;
+}
+
 .schedule-matrix-day {
     display: grid;
     place-items: center;
@@ -1062,6 +1097,22 @@ select:focus {
     background: rgba(255, 255, 255, 0.9);
     color: var(--text);
     font-weight: 900;
+}
+
+.schedule-matrix-day.has-week-next {
+    padding-right: 2.2rem;
+}
+
+.schedule-week-next-btn {
+    position: absolute;
+    top: 50%;
+    right: 0.34rem;
+    transform: translateY(-50%);
+}
+
+.schedule-week-next-btn:hover,
+.schedule-week-next-btn:focus-visible {
+    transform: translateY(calc(-50% - 1px));
 }
 
 .schedule-matrix-day span {

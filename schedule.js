@@ -613,6 +613,7 @@ function render() {
         dom.logoutBtn.hidden = true;
         dom.syncPill.hidden = true;
         dom.sessionPill.hidden = true;
+        document.body.classList.remove("manager-schedule-view");
         refreshIcons();
         return;
     }
@@ -625,11 +626,16 @@ function render() {
 
     updateSessionUi();
     renderSyncStatus();
+    updateViewModeClasses();
     renderWeekdays();
     renderMonthLabel();
     renderNavigation();
     renderActiveView();
     refreshIcons();
+}
+
+function updateViewModeClasses() {
+    document.body.classList.toggle("manager-schedule-view", isManagerScheduleView());
 }
 
 async function hydrateRemoteState() {
@@ -1473,12 +1479,23 @@ function renderScheduleMatrix() {
     }
 
     const header = [
-        `<div class="schedule-matrix-name schedule-matrix-corner"></div>`,
-        ...days.map((date) => {
+        `<div class="schedule-matrix-name schedule-matrix-corner schedule-week-corner">
+            <button class="icon-button schedule-week-grid-btn" type="button" data-action="change-schedule-week" data-delta="-1" aria-label="Previous week" title="Previous week">
+                <i data-lucide="chevron-left"></i>
+            </button>
+            <span>Week</span>
+        </div>`,
+        ...days.map((date, index) => {
+            const isLastDay = index === days.length - 1;
             return `
-                <div class="schedule-matrix-day">
+                <div class="schedule-matrix-day ${isLastDay ? "has-week-next" : ""}">
                     <span>${escapeHtml(formatPrintWeekday(date))}</span>
                     <strong>${date.getDate()}</strong>
+                    ${isLastDay ? `
+                        <button class="icon-button schedule-week-grid-btn schedule-week-next-btn" type="button" data-action="change-schedule-week" data-delta="1" aria-label="Next week" title="Next week">
+                            <i data-lucide="chevron-right"></i>
+                        </button>
+                    ` : ""}
                 </div>
             `;
         })
@@ -1499,6 +1516,7 @@ function renderScheduleMatrix() {
     });
 
     dom.scheduleMatrix.innerHTML = [...header, ...rows].join("");
+    refreshIcons();
 }
 
 function renderScheduleMatrixCell(employee, dateKey) {
@@ -2205,6 +2223,12 @@ function handleManagerAvailabilityClick(event) {
 }
 
 function handleScheduleMatrixClick(event) {
+    const weekButton = event.target.closest("[data-action='change-schedule-week']");
+    if (weekButton) {
+        changeWeek(Number(weekButton.dataset.delta));
+        return;
+    }
+
     const cellButton = event.target.closest("[data-action='edit-schedule-cell']");
     if (!cellButton) return;
     openShiftPopover(cellButton.dataset.employeeId, cellButton.dataset.date, cellButton);
