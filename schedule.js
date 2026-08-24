@@ -39,6 +39,14 @@ const employeeColors = [
     "#ff2d55"
 ];
 
+const defaultShiftTemplates = [
+    { id: "template-boh-open", name: "Kitchen open", area: "boh", role: "Kitchen", start: "10:00", end: "17:00", note: "" },
+    { id: "template-boh-dinner", name: "Kitchen dinner", area: "boh", role: "Cook", start: "17:00", end: "23:00", note: "" },
+    { id: "template-boh-dish-close", name: "Dish close", area: "boh", role: "Dishwashing", start: "18:00", end: "00:00", note: "" },
+    { id: "template-foh-lunch", name: "FOH lunch", area: "foh", role: "Service", start: "11:00", end: "17:00", note: "" },
+    { id: "template-foh-dinner", name: "FOH dinner", area: "foh", role: "Service", start: "17:00", end: "23:00", note: "" }
+];
+
 const stateTemplate = () => ({
     managerCode: "MANAGER2026",
     managerCodes: {
@@ -51,7 +59,13 @@ const stateTemplate = () => ({
         { id: "emp-noah", name: "Noah Pop", role: "Dishwashing", code: "NOAH315", color: "#ff9500", area: "boh", category: "dishwashing", order: 0 }
     ],
     availability: {},
-    shifts: {}
+    shifts: {},
+    publishedShifts: {},
+    publishedAt: {},
+    shiftTemplates: defaultShiftTemplates,
+    coverageTargets: {},
+    confirmations: {},
+    swapRequests: []
 });
 
 let state = normalizeState(loadState());
@@ -67,6 +81,8 @@ let isApplyingRemoteState = false;
 let syncStatus = { label: "Local only", type: "local" };
 let availabilityBuilderFilter = "available";
 let availabilityBuilderSelectedIds = new Set();
+let copiedDayShifts = null;
+let copiedWeekShifts = null;
 
 const dom = {};
 
@@ -98,6 +114,7 @@ function captureDom() {
         "todayBtn",
         "exportPdfBtn",
         "exportPdfLabel",
+        "exportPayrollBtn",
         "exportMode",
         "monthLabel",
         "printHeading",
@@ -113,16 +130,28 @@ function captureDom() {
         "hoursScrollPrev",
         "hoursScrollNext",
         "managerHoursSummary",
+        "publishStatus",
+        "copyDayBtn",
+        "pasteDayBtn",
+        "copyWeekBtn",
+        "pasteWeekBtn",
+        "publishScheduleBtn",
+        "scheduleWarnings",
+        "weekBuilder",
+        "coveragePanel",
         "employeeHoursSummary",
         "managerSelectedDate",
         "employeeSelectedDate",
         "managerDayAvailability",
         "shiftForm",
+        "shiftTemplate",
         "shiftEmployee",
         "shiftRole",
         "shiftStart",
         "shiftEnd",
         "shiftNote",
+        "shiftPrivateNote",
+        "saveShiftTemplateBtn",
         "shiftFormMessage",
         "dayShiftList",
         "availabilityForm",
@@ -141,10 +170,12 @@ function captureDom() {
         "builderNextDayBtn",
         "availabilityBuilderStats",
         "availabilityScheduleForm",
+        "builderShiftTemplate",
         "builderShiftRole",
         "builderShiftStart",
         "builderShiftEnd",
         "builderShiftNote",
+        "builderShiftPrivateNote",
         "builderSelectedCount",
         "builderVisibleCount",
         "availabilityBuilderList",
@@ -174,7 +205,13 @@ function bindEvents() {
     dom.nextMonthBtn.addEventListener("click", () => changeMonth(1));
     dom.todayBtn.addEventListener("click", jumpToToday);
     dom.exportPdfBtn.addEventListener("click", exportCurrentViewAsPdf);
+    dom.exportPayrollBtn.addEventListener("click", exportPayrollCsv);
     dom.exportMode.addEventListener("change", updateExportControls);
+    dom.copyDayBtn.addEventListener("click", copySelectedDay);
+    dom.pasteDayBtn.addEventListener("click", pasteCopiedDay);
+    dom.copyWeekBtn.addEventListener("click", copySelectedWeek);
+    dom.pasteWeekBtn.addEventListener("click", pasteCopiedWeek);
+    dom.publishScheduleBtn.addEventListener("click", publishCurrentMonth);
     dom.hoursScrollPrev.addEventListener("click", () => scrollStrip(dom.managerHoursSummary, -1));
     dom.hoursScrollNext.addEventListener("click", () => scrollStrip(dom.managerHoursSummary, 1));
     dom.managerHoursSummary.addEventListener("scroll", updateHoursScrollControls);
@@ -189,14 +226,20 @@ function bindEvents() {
     dom.availabilityScheduleForm.addEventListener("submit", handleAvailabilityScheduleSubmit);
     dom.managerCalendarGrid.addEventListener("click", handleCalendarClick);
     dom.employeeCalendarGrid.addEventListener("click", handleCalendarClick);
+    dom.weekBuilder.addEventListener("click", handleWeekBuilderClick);
+    dom.coveragePanel.addEventListener("input", handleCoverageInput);
     dom.shiftForm.addEventListener("submit", handleShiftSubmit);
+    dom.shiftTemplate.addEventListener("change", () => applyShiftTemplate(dom.shiftTemplate.value, "shift"));
+    dom.saveShiftTemplateBtn.addEventListener("click", saveCurrentShiftTemplate);
     dom.availabilityForm.addEventListener("submit", handleAvailabilitySubmit);
     dom.clearAvailabilityBtn.addEventListener("click", clearAvailability);
+    dom.builderShiftTemplate.addEventListener("change", () => applyShiftTemplate(dom.builderShiftTemplate.value, "builder"));
     dom.employeeForm.addEventListener("submit", handleEmployeeSubmit);
     dom.generateCodeBtn.addEventListener("click", fillGeneratedEmployeeCode);
     dom.employeeList.addEventListener("click", handleEmployeeListClick);
     dom.employeeList.addEventListener("change", handleEmployeeListChange);
     dom.dayShiftList.addEventListener("click", handleShiftListClick);
+    dom.employeeDayShifts.addEventListener("click", handleEmployeeShiftClick);
     window.addEventListener("afterprint", cleanupPdfExport);
     window.addEventListener("resize", updateScrollControls);
 
@@ -226,6 +269,9 @@ function loadState() {
 
 function normalizeState(nextState) {
     const template = stateTemplate();
+    const rawShifts = nextState && nextState.shifts ? nextState.shifts : template.shifts;
+    const normalizedShifts = normalizeShiftsByDate(rawShifts);
+    const rawPublishedShifts = nextState && nextState.publishedShifts ? nextState.publishedShifts : rawShifts;
     const normalizedState = {
         ...template,
         ...(nextState || {}),
@@ -237,10 +283,70 @@ function normalizeState(nextState) {
             ? nextState.employees.map(normalizeEmployee)
             : template.employees.map(normalizeEmployee),
         availability: nextState && nextState.availability ? nextState.availability : {},
-        shifts: nextState && nextState.shifts ? nextState.shifts : {}
+        shifts: normalizedShifts,
+        publishedShifts: normalizeShiftsByDate(rawPublishedShifts),
+        publishedAt: nextState && nextState.publishedAt ? nextState.publishedAt : {},
+        shiftTemplates: normalizeShiftTemplates(nextState && nextState.shiftTemplates),
+        coverageTargets: nextState && nextState.coverageTargets ? nextState.coverageTargets : {},
+        confirmations: nextState && nextState.confirmations ? nextState.confirmations : {},
+        swapRequests: normalizeSwapRequests(nextState && nextState.swapRequests)
     };
     normalizeEmployeeOrders(normalizedState.employees);
     return normalizedState;
+}
+
+function normalizeShiftsByDate(shiftsByDate = {}) {
+    return Object.entries(shiftsByDate || {}).reduce((normalized, [dateKey, shifts]) => {
+        if (!Array.isArray(shifts)) return normalized;
+        const cleanShifts = shifts.map(normalizeShift).filter((shift) => shift.employeeId && shift.start && shift.end);
+        if (cleanShifts.length) normalized[dateKey] = cleanShifts;
+        return normalized;
+    }, {});
+}
+
+function normalizeShift(shift = {}) {
+    return {
+        id: shift.id || `shift-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        employeeId: shift.employeeId || "",
+        start: shift.start || "09:00",
+        end: shift.end || "17:00",
+        role: shift.role || "",
+        note: shift.note || "",
+        privateNote: shift.privateNote || ""
+    };
+}
+
+function normalizeShiftTemplates(templates) {
+    const incoming = Array.isArray(templates) ? templates : [];
+    const merged = [...defaultShiftTemplates, ...incoming].reduce((map, template) => {
+        if (!template || !template.id) return map;
+        map.set(template.id, {
+            id: template.id,
+            name: template.name || "Shift template",
+            area: managerAreas[template.area] ? template.area : "all",
+            role: template.role || "",
+            start: template.start || "09:00",
+            end: template.end || "17:00",
+            note: template.note || "",
+            privateNote: template.privateNote || ""
+        });
+        return map;
+    }, new Map());
+    return [...merged.values()];
+}
+
+function normalizeSwapRequests(requests) {
+    return Array.isArray(requests)
+        ? requests.map((request) => ({
+            id: request.id || `swap-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            shiftId: request.shiftId || "",
+            employeeId: request.employeeId || "",
+            dateKey: request.dateKey || "",
+            message: request.message || "",
+            status: ["pending", "approved", "denied"].includes(request.status) ? request.status : "pending",
+            createdAt: request.createdAt || new Date().toISOString()
+        })).filter((request) => request.shiftId && request.employeeId && request.dateKey)
+        : [];
 }
 
 function normalizeEmployee(employee) {
@@ -696,10 +802,11 @@ function renderManagerSchedulePrintPacket({ includeFullData = false } = {}) {
     }).format(new Date());
 
     const pages = [
-        ...weeks.flatMap((week, index) => renderPrintWeekPages(week, index, manager, employees, title, subtitle, generated)),
+        ...weeks.flatMap((week, index) => renderPrintWeekPages(week, index, manager, employees, title, subtitle, generated, state.shifts)),
         ...(includeFullData
             ? [
                 renderPrintTotalsPage(manager, employees, title, subtitle, generated),
+                renderPrintWorkflowPage(manager, employees, title, subtitle, generated),
                 renderPrintCoveragePage(manager, employees, title, subtitle, generated),
                 ...renderPrintAvailabilityPages(manager, employees, title, subtitle, generated)
             ]
@@ -729,7 +836,7 @@ function renderEmployeeSchedulePrintPacket() {
     }).format(new Date());
 
     dom.printPacket.innerHTML = weeks
-        .flatMap((week, index) => renderPrintWeekPages(week, index, manager, [employee], title, subtitle, generated))
+        .flatMap((week, index) => renderPrintWeekPages(week, index, manager, [employee], title, subtitle, generated, state.publishedShifts))
         .join("");
 }
 
@@ -752,25 +859,25 @@ function renderPrintPageHeader(title, subtitle, kicker, generated, stats) {
     `;
 }
 
-function renderPrintWeekPages(week, index, manager, employees, title, subtitle, generated) {
+function renderPrintWeekPages(week, index, manager, employees, title, subtitle, generated, shiftsByDate = state.shifts) {
     const monthDates = week.filter((date) => isSameMonth(date, currentMonth));
     const printGroups = getPrintEmployeeGroups(employees, manager.area);
     if (!printGroups.length) {
-        return [renderPrintWeekPage(week, index, { label: "Team", employees: [] }, monthDates, title, subtitle, generated)];
+        return [renderPrintWeekPage(week, index, { label: "Team", employees: [] }, monthDates, title, subtitle, generated, shiftsByDate)];
     }
-    return printGroups.map((printGroup) => renderPrintWeekPage(week, index, printGroup, monthDates, title, subtitle, generated));
+    return printGroups.map((printGroup) => renderPrintWeekPage(week, index, printGroup, monthDates, title, subtitle, generated, shiftsByDate));
 }
 
-function renderPrintWeekPage(week, index, printGroup, monthDates, title, subtitle, generated) {
+function renderPrintWeekPage(week, index, printGroup, monthDates, title, subtitle, generated, shiftsByDate = state.shifts) {
     const weekDateKeys = monthDates.map(formatDate);
-    const weekStats = getShiftStatsForDates(weekDateKeys, printGroup.employees);
+    const weekStats = getShiftStatsForDates(weekDateKeys, printGroup.employees, shiftsByDate);
     const stats = `${weekStats.shifts} ${weekStats.shifts === 1 ? "shift" : "shifts"} | ${formatHours(weekStats.minutes)}`;
     const bodyRows = printGroup.employees.length
         ? `
             <tr class="print-group-row">
                 <td colspan="8">${escapeHtml(printGroup.label)}</td>
             </tr>
-            ${printGroup.employees.map((employee) => renderPrintEmployeeWeekRow(employee, week)).join("")}
+            ${printGroup.employees.map((employee) => renderPrintEmployeeWeekRow(employee, week, shiftsByDate)).join("")}
         `
         : `<tr><td colspan="8" class="print-empty-row">No employees have been added yet.</td></tr>`;
 
@@ -795,7 +902,7 @@ function renderPrintWeekPage(week, index, printGroup, monthDates, title, subtitl
     `;
 }
 
-function renderPrintEmployeeWeekRow(employee, week) {
+function renderPrintEmployeeWeekRow(employee, week, shiftsByDate = state.shifts) {
     return `
         <tr>
             <th>
@@ -804,7 +911,7 @@ function renderPrintEmployeeWeekRow(employee, week) {
             </th>
             ${week.map((date) => {
                 const outside = !isSameMonth(date, currentMonth);
-                const shifts = outside ? [] : getEmployeeShiftsForDate(employee.id, formatDate(date));
+                const shifts = outside ? [] : getEmployeeShiftsForDate(employee.id, formatDate(date), shiftsByDate);
                 return `
                     <td class="${outside ? "print-outside" : ""}">
                         ${shifts.length ? shifts.map((shift) => renderPrintShift(shift, employee)).join("") : `<span class="print-empty-cell">-</span>`}
@@ -886,6 +993,50 @@ function renderPrintTotalsPage(manager, employees, title, subtitle, generated) {
     `;
 }
 
+function renderPrintWorkflowPage(manager, employees, title, subtitle, generated) {
+    const employeeIds = new Set(employees.map((employee) => employee.id));
+    const shifts = getAreaMonthShifts(state.shifts, manager.area, currentMonth)
+        .filter((shift) => employeeIds.has(shift.employeeId))
+        .sort((first, second) => `${first.dateKey}-${first.start}`.localeCompare(`${second.dateKey}-${second.start}`));
+    const confirmedCount = shifts.filter((shift) => isShiftConfirmed(shift.id, shift.employeeId)).length;
+    const pendingSwaps = state.swapRequests.filter((request) => {
+        const shift = shifts.find((item) => item.id === request.shiftId);
+        return shift && request.status === "pending";
+    }).length;
+
+    return `
+        <article class="print-page print-summary-page">
+            ${renderPrintPageHeader(title, subtitle, "Publish, confirmations, swap requests", generated, `${confirmedCount}/${shifts.length} confirmed | ${pendingSwaps} pending swaps`)}
+            <table class="print-totals-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Employee</th>
+                        <th>Shift</th>
+                        <th>Confirmed</th>
+                        <th>Swap requests</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${shifts.length ? shifts.map((shift) => {
+                        const employee = getEmployee(shift.employeeId);
+                        const swaps = getSwapRequestsForShift(shift.id);
+                        return `
+                            <tr>
+                                <th>${escapeHtml(shift.dateKey)}</th>
+                                <td>${escapeHtml(employee ? employee.name : "Removed employee")}</td>
+                                <td>${escapeHtml(`${shift.start}-${shift.end} ${shift.role || "Shift"}`)}</td>
+                                <td>${isShiftConfirmed(shift.id, shift.employeeId) ? "Yes" : "No"}</td>
+                                <td>${swaps.length ? escapeHtml(swaps.map((request) => request.status).join(", ")) : "-"}</td>
+                            </tr>
+                        `;
+                    }).join("") : `<tr><td colspan="5" class="print-empty-row">No shifts scheduled yet.</td></tr>`}
+                </tbody>
+            </table>
+        </article>
+    `;
+}
+
 function renderPrintCoveragePage(manager, employees, title, subtitle, generated) {
     const days = getMonthDates(currentMonth);
     const teamStats = getShiftStatsForDates(days.map(formatDate), employees);
@@ -898,6 +1049,7 @@ function renderPrintCoveragePage(manager, employees, title, subtitle, generated)
                         <th>Date</th>
                         <th>Shifts</th>
                         <th>Hours</th>
+                        <th>Targets</th>
                         <th>Available</th>
                         <th>Maybe</th>
                         <th>Unavailable</th>
@@ -913,6 +1065,7 @@ function renderPrintCoveragePage(manager, employees, title, subtitle, generated)
                                 <th>${escapeHtml(formatPrintWeekday(date))} ${escapeHtml(formatPrintDate(date))}</th>
                                 <td>${stats.shifts}</td>
                                 <td>${formatHours(stats.minutes)}</td>
+                                <td>${escapeHtml(formatCoverageTargetSummary(dateKey, manager.area))}</td>
                                 <td>${availability.available}</td>
                                 <td>${availability.maybe}</td>
                                 <td>${availability.unavailable}</td>
@@ -1013,13 +1166,158 @@ function renderMonthLabel() {
 }
 
 function renderManagerSchedule() {
+    renderScheduleWorkflow();
+    renderScheduleWarnings();
     renderManagerHoursSummary();
     renderCalendar(dom.managerCalendarGrid, "manager");
+    renderWeekBuilder();
     dom.managerSelectedDate.textContent = longDate(selectedDate);
     dom.shiftFormMessage.textContent = "";
+    renderShiftTemplateOptions();
+    renderCoveragePanel();
     renderShiftEmployeeOptions();
     renderManagerDayAvailability();
     renderDayShifts();
+}
+
+function renderScheduleWorkflow() {
+    const manager = getCurrentManagerConfig();
+    const key = getPublishKey(manager.area, currentMonth);
+    const publishedAt = state.publishedAt[key];
+    const draftShifts = getAreaMonthShifts(state.shifts, manager.area, currentMonth).length;
+    const publishedShifts = getAreaMonthShifts(state.publishedShifts, manager.area, currentMonth).length;
+    const publishDetail = publishedAt
+        ? `Published ${formatDateTime(publishedAt)}`
+        : "Not published yet";
+    const status = arePublishedShiftsCurrent(manager.area, currentMonth)
+        ? "Employees are seeing the current schedule."
+        : "Draft has unpublished changes.";
+
+    dom.publishStatus.textContent = `${status} Draft ${draftShifts}, published ${publishedShifts}. ${publishDetail}.`;
+    dom.pasteDayBtn.disabled = !copiedDayShifts;
+    dom.pasteWeekBtn.disabled = !copiedWeekShifts;
+}
+
+function renderScheduleWarnings() {
+    const warnings = getScheduleWarnings(selectedDate);
+    if (!warnings.length) {
+        dom.scheduleWarnings.innerHTML = "";
+        return;
+    }
+
+    dom.scheduleWarnings.innerHTML = warnings.map((warning) => `
+        <div class="schedule-warning ${warning.severity || "notice"}">
+            <i data-lucide="${warning.icon || "circle-alert"}"></i>
+            <div>
+                <strong>${escapeHtml(warning.title)}</strong>
+                <span>${escapeHtml(warning.detail)}</span>
+            </div>
+        </div>
+    `).join("");
+    refreshIcons();
+}
+
+function renderCoveragePanel() {
+    const manager = getCurrentManagerConfig();
+    const groups = getCoverageTargetGroups(manager.area);
+    const targets = getCoverageTargets(selectedDate, manager.area);
+    const counts = getCoverageCounts(selectedDate, manager.area);
+    dom.coveragePanel.innerHTML = `
+        <div class="coverage-head">
+            <div>
+                <p class="eyebrow">Coverage targets</p>
+                <h3>Needed today</h3>
+            </div>
+        </div>
+        <div class="coverage-grid">
+            ${groups.map((group) => {
+                const target = targets[group.id] || 0;
+                const count = counts[group.id] || 0;
+                const status = target && count < target ? "low" : (target && count > target ? "high" : "ok");
+                return `
+                    <label class="coverage-item ${status}">
+                        <span>${escapeHtml(group.label)}</span>
+                        <input type="number" min="0" step="1" value="${target}" data-coverage-target="${group.id}" aria-label="${escapeHtml(group.label)} target">
+                        <small>${count}/${target || 0} scheduled</small>
+                    </label>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
+
+function renderWeekBuilder() {
+    const manager = getCurrentManagerConfig();
+    const employees = getManagerEmployees();
+    const week = getWeekDates(parseDate(selectedDate));
+    const gridColumns = `minmax(160px, 190px) repeat(7, minmax(118px, 1fr))`;
+
+    if (!employees.length) {
+        dom.weekBuilder.innerHTML = `<p class="empty-state">Add employees to use the weekly builder.</p>`;
+        return;
+    }
+
+    const rows = getGroupedEmployees(employees, manager.area).flatMap((group) => {
+        if (!group.employees.length) return [];
+        return [
+            `<div class="week-builder-group">${escapeHtml(group.label)}</div>`,
+            ...group.employees.flatMap((employee) => [
+                `<div class="week-builder-employee">
+                    <strong>${escapeHtml(employee.name)}</strong>
+                    <span>${escapeHtml(formatHours(getWeekMinutesForEmployee(employee.id, week)))}</span>
+                </div>`,
+                ...week.map((date) => renderWeekBuilderCell(employee, date))
+            ])
+        ];
+    });
+
+    dom.weekBuilder.innerHTML = `
+        <div class="week-builder-head">
+            <div>
+                <p class="eyebrow">Weekly builder</p>
+                <h2>${escapeHtml(formatDateRange(week))}</h2>
+            </div>
+            <span>Tap a day to edit it on the right.</span>
+        </div>
+        <div class="week-builder-grid" style="grid-template-columns:${gridColumns}">
+            <div class="week-builder-corner"></div>
+            ${week.map((date) => {
+                const dateKey = formatDate(date);
+                return `
+                    <button class="week-builder-day ${dateKey === selectedDate ? "selected" : ""}" type="button" data-date="${dateKey}">
+                        <span>${escapeHtml(formatPrintWeekday(date))}</span>
+                        <strong>${date.getDate()}</strong>
+                    </button>
+                `;
+            }).join("")}
+            ${rows.join("")}
+        </div>
+    `;
+}
+
+function renderWeekBuilderCell(employee, date) {
+    const dateKey = formatDate(date);
+    const shifts = getEmployeeShiftsForDate(employee.id, dateKey);
+    const availability = getAvailability(employee.id, dateKey);
+    const status = shifts.length ? "scheduled" : (availability ? availability.status : "none");
+    return `
+        <button class="week-builder-cell ${status} ${dateKey === selectedDate ? "selected-column" : ""}" type="button" data-date="${dateKey}">
+            ${shifts.length
+                ? shifts.map((shift) => `<span>${escapeHtml(shift.start)}-${escapeHtml(shift.end)}</span>`).join("")
+                : `<small>${escapeHtml(statusShort(status) || "-")}</small>`}
+        </button>
+    `;
+}
+
+function renderShiftTemplateOptions() {
+    const manager = getCurrentManagerConfig();
+    const templates = getShiftTemplatesForArea(manager.area);
+    const options = [
+        `<option value="">Custom shift</option>`,
+        ...templates.map((template) => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)} (${escapeHtml(template.start)}-${escapeHtml(template.end)})</option>`)
+    ].join("");
+    dom.shiftTemplate.innerHTML = options;
+    dom.builderShiftTemplate.innerHTML = options;
 }
 
 function renderEmployeeAvailability() {
@@ -1107,7 +1405,7 @@ function renderShiftPills(dateKey) {
 function renderEmployeeShiftPills(dateKey) {
     const employee = getCurrentEmployee();
     if (!employee) return "";
-    const shifts = (state.shifts[dateKey] || []).filter((shift) => shift.employeeId === employee.id);
+    const shifts = getEmployeeShiftsForDate(employee.id, dateKey, state.publishedShifts);
     return shifts.map((shift) => `
         <div class="shift-pill" style="background:${employee.color}">
             <span>${escapeHtml(shift.start)}-${escapeHtml(shift.end)}</span>
@@ -1181,12 +1479,12 @@ function renderManagerHoursSummary() {
 
 function renderEmployeeHoursSummary(employeeId) {
     const employee = getEmployee(employeeId);
-    const minutes = getEmployeeMonthlyMinutes(employeeId, currentMonth);
-    const shifts = getEmployeeMonthlyShiftCount(employeeId, currentMonth);
+    const minutes = getEmployeeMonthlyMinutes(employeeId, currentMonth, state.publishedShifts);
+    const shifts = getEmployeeMonthlyShiftCount(employeeId, currentMonth, state.publishedShifts);
     dom.employeeHoursSummary.innerHTML = `
         <span class="hours-name">${escapeHtml(monthTitle(currentMonth))}</span>
         <span class="hours-value">${formatHours(minutes)}</span>
-        <span class="hours-detail">${escapeHtml(employee.name)} has ${shifts} scheduled ${shifts === 1 ? "shift" : "shifts"}</span>
+        <span class="hours-detail">${escapeHtml(employee.name)} has ${shifts} published ${shifts === 1 ? "shift" : "shifts"}</span>
     `;
 }
 
@@ -1241,12 +1539,26 @@ function renderDayShifts() {
     dom.dayShiftList.innerHTML = summary + shifts.map((shift) => {
         const employee = getEmployee(shift.employeeId);
         const color = employee ? employee.color : "#8e8e93";
+        const pendingSwap = getSwapRequestsForShift(shift.id).find((request) => request.status === "pending");
         return `
-            <div class="mini-shift" style="background:${color}">
-                <span>${escapeHtml(formatShiftLabel(shift, employee))}</span>
-                <button type="button" data-action="remove-shift" data-id="${shift.id}" aria-label="Remove shift" title="Remove shift">
-                    <i data-lucide="trash-2"></i>
-                </button>
+            <div class="mini-shift manager-shift-card" style="background:${color}">
+                <span>
+                    ${escapeHtml(formatShiftLabel(shift, employee))}
+                    ${renderManagerShiftMeta(shift, employee)}
+                </span>
+                <div class="mini-shift-actions">
+                    ${pendingSwap ? `
+                        <button type="button" data-action="approve-swap" data-id="${pendingSwap.id}" aria-label="Approve swap request" title="Approve swap request">
+                            <i data-lucide="check-check"></i>
+                        </button>
+                        <button type="button" data-action="deny-swap" data-id="${pendingSwap.id}" aria-label="Deny swap request" title="Deny swap request">
+                            <i data-lucide="ban"></i>
+                        </button>
+                    ` : ""}
+                    <button type="button" data-action="remove-shift" data-id="${shift.id}" aria-label="Remove shift" title="Remove shift">
+                        <i data-lucide="trash-2"></i>
+                    </button>
+                </div>
             </div>
         `;
     }).join("");
@@ -1269,18 +1581,31 @@ function renderAvailabilityForm() {
 }
 
 function renderEmployeeDayShifts(employeeId) {
-    const shifts = (state.shifts[selectedDate] || []).filter((shift) => shift.employeeId === employeeId);
+    const shifts = getEmployeeShiftsForDate(employeeId, selectedDate, state.publishedShifts);
     if (!shifts.length) {
-        dom.employeeDayShifts.innerHTML = `<p class="empty-state">No scheduled shifts for this day.</p>`;
+        dom.employeeDayShifts.innerHTML = `<p class="empty-state">No published shifts for this day.</p>`;
         return;
     }
 
     const employee = getEmployee(employeeId);
     dom.employeeDayShifts.innerHTML = shifts.map((shift) => `
-        <div class="mini-shift" style="background:${employee.color}">
-            <span>${escapeHtml(shift.start)}-${escapeHtml(shift.end)} ${escapeHtml(shift.role || "Shift")}</span>
+        <div class="mini-shift employee-shift-card" style="background:${employee.color}">
+            <span>
+                ${escapeHtml(shift.start)}-${escapeHtml(shift.end)} ${escapeHtml(shift.role || "Shift")}
+                ${shift.note ? `<small>${escapeHtml(shift.note)}</small>` : ""}
+                ${renderEmployeeShiftMeta(shift, employee)}
+            </span>
+            <div class="mini-shift-actions">
+                <button type="button" data-action="confirm-shift" data-id="${shift.id}" aria-label="Confirm shift" title="Confirm shift" ${isShiftConfirmed(shift.id, employee.id) ? "disabled" : ""}>
+                    <i data-lucide="${isShiftConfirmed(shift.id, employee.id) ? "check-check" : "check"}"></i>
+                </button>
+                <button type="button" data-action="request-swap" data-id="${shift.id}" aria-label="Request shift swap" title="Request swap" ${getEmployeeSwapRequest(shift.id, employee.id) ? "disabled" : ""}>
+                    <i data-lucide="repeat-2"></i>
+                </button>
+            </div>
         </div>
     `).join("");
+    refreshIcons();
 }
 
 function renderAvailabilityMatrix() {
@@ -1342,6 +1667,7 @@ function renderAvailabilityBuilder() {
     }));
 
     dom.availabilityBuilderSelectedDate.textContent = longDate(selectedDate);
+    renderShiftTemplateOptions();
     dom.availabilityBuilderStats.innerHTML = [
         renderBuilderStat("Available", summary.available, "available"),
         renderBuilderStat("Maybe", summary.maybe, "maybe"),
@@ -1554,13 +1880,15 @@ function handleAvailabilityScheduleSubmit(event) {
         start: dom.builderShiftStart.value,
         end: dom.builderShiftEnd.value,
         role: dom.builderShiftRole.value.trim(),
-        note: dom.builderShiftNote.value.trim()
+        note: dom.builderShiftNote.value.trim(),
+        privateNote: dom.builderShiftPrivateNote.value.trim()
     }));
 
     state.shifts[selectedDate] = [...(state.shifts[selectedDate] || []), ...newShifts];
     saveState();
     availabilityBuilderSelectedIds.clear();
     dom.builderShiftNote.value = "";
+    dom.builderShiftPrivateNote.value = "";
     renderAvailabilityMatrix();
     dom.availabilityBuilderMessage.textContent = `Added ${newShifts.length} ${newShifts.length === 1 ? "shift" : "shifts"} for ${longDate(selectedDate)}.`;
 }
@@ -1591,24 +1919,50 @@ function handleShiftSubmit(event) {
         start: dom.shiftStart.value,
         end: dom.shiftEnd.value,
         role: dom.shiftRole.value.trim(),
-        note: dom.shiftNote.value.trim()
+        note: dom.shiftNote.value.trim(),
+        privateNote: dom.shiftPrivateNote.value.trim()
     });
 
     state.shifts[selectedDate] = [...(state.shifts[selectedDate] || []), shift];
     saveState();
     dom.shiftNote.value = "";
+    dom.shiftPrivateNote.value = "";
     dom.shiftFormMessage.textContent = "";
     renderManagerSchedule();
 }
 
 function handleShiftListClick(event) {
+    const swapButton = event.target.closest("[data-action='approve-swap'], [data-action='deny-swap']");
+    if (swapButton) {
+        updateSwapRequestStatus(swapButton.dataset.id, swapButton.dataset.action === "approve-swap" ? "approved" : "denied");
+        return;
+    }
+
     const button = event.target.closest("[data-action='remove-shift']");
     if (!button) return;
     const shifts = state.shifts[selectedDate] || [];
     state.shifts[selectedDate] = shifts.filter((shift) => shift.id !== button.dataset.id);
     if (!state.shifts[selectedDate].length) delete state.shifts[selectedDate];
+    state.swapRequests = state.swapRequests.filter((request) => request.shiftId !== button.dataset.id);
+    delete state.confirmations[button.dataset.id];
     saveState();
     renderManagerSchedule();
+}
+
+function handleEmployeeShiftClick(event) {
+    const employee = getCurrentEmployee();
+    if (!employee) return;
+
+    const confirmButton = event.target.closest("[data-action='confirm-shift']");
+    if (confirmButton) {
+        confirmShift(confirmButton.dataset.id, employee.id);
+        return;
+    }
+
+    const swapButton = event.target.closest("[data-action='request-swap']");
+    if (swapButton) {
+        requestShiftSwap(swapButton.dataset.id, employee.id);
+    }
 }
 
 function handleAvailabilitySubmit(event) {
@@ -1732,6 +2086,15 @@ function removeEmployee(employeeId) {
         state.shifts[dateKey] = state.shifts[dateKey].filter((shift) => shift.employeeId !== employeeId);
         if (!state.shifts[dateKey].length) delete state.shifts[dateKey];
     });
+    Object.keys(state.publishedShifts).forEach((dateKey) => {
+        state.publishedShifts[dateKey] = state.publishedShifts[dateKey].filter((shift) => shift.employeeId !== employeeId);
+        if (!state.publishedShifts[dateKey].length) delete state.publishedShifts[dateKey];
+    });
+    state.swapRequests = state.swapRequests.filter((request) => request.employeeId !== employeeId);
+    Object.keys(state.confirmations).forEach((shiftId) => {
+        delete state.confirmations[shiftId][employeeId];
+        if (!Object.keys(state.confirmations[shiftId]).length) delete state.confirmations[shiftId];
+    });
     if (currentUser && currentUser.type === "employee" && currentUser.employeeId === employeeId) {
         currentUser = null;
         saveSession();
@@ -1739,6 +2102,341 @@ function removeEmployee(employeeId) {
     normalizeEmployeeOrders(state.employees, area);
     saveState();
     render();
+}
+
+function handleWeekBuilderClick(event) {
+    const button = event.target.closest("[data-date]");
+    if (!button) return;
+    setSelectedDate(parseDate(button.dataset.date));
+}
+
+function handleCoverageInput(event) {
+    const input = event.target.closest("[data-coverage-target]");
+    if (!input) return;
+
+    const manager = getCurrentManagerConfig();
+    const targetKey = input.dataset.coverageTarget;
+    const value = Math.max(0, Number.parseInt(input.value, 10) || 0);
+    if (!state.coverageTargets[selectedDate]) state.coverageTargets[selectedDate] = {};
+    if (!state.coverageTargets[selectedDate][manager.area]) state.coverageTargets[selectedDate][manager.area] = {};
+    state.coverageTargets[selectedDate][manager.area][targetKey] = value;
+    saveState();
+    renderCoveragePanel();
+    renderScheduleWarnings();
+}
+
+function publishCurrentMonth() {
+    const manager = getCurrentManagerConfig();
+    const monthKeys = new Set([
+        ...Object.keys(state.shifts),
+        ...Object.keys(state.publishedShifts)
+    ].filter((dateKey) => isSameMonth(parseDate(dateKey), currentMonth)));
+
+    monthKeys.forEach((dateKey) => {
+        const existingPublished = state.publishedShifts[dateKey] || [];
+        const outsideArea = existingPublished.filter((shift) => {
+            const employee = getEmployee(shift.employeeId);
+            return !employee || getEmployeeArea(employee) !== manager.area;
+        });
+        const areaDraft = getDateShiftsForArea(dateKey, manager.area, state.shifts)
+            .map((shift) => cloneShift(shift, { keepId: true }));
+        const merged = [...outsideArea, ...areaDraft];
+        if (merged.length) {
+            state.publishedShifts[dateKey] = merged;
+        } else {
+            delete state.publishedShifts[dateKey];
+        }
+    });
+
+    state.publishedAt[getPublishKey(manager.area, currentMonth)] = new Date().toISOString();
+    pruneShiftTracking();
+    saveState();
+    render();
+}
+
+function copySelectedDay() {
+    const manager = getCurrentManagerConfig();
+    copiedDayShifts = {
+        sourceDate: selectedDate,
+        shifts: getDateShiftsForArea(selectedDate, manager.area, state.shifts).map((shift) => cloneShift(shift))
+    };
+    dom.shiftFormMessage.textContent = `${copiedDayShifts.shifts.length} ${copiedDayShifts.shifts.length === 1 ? "shift" : "shifts"} copied from ${longDate(selectedDate)}.`;
+    renderScheduleWorkflow();
+}
+
+function pasteCopiedDay() {
+    if (!copiedDayShifts) return;
+    const additions = copiedDayShifts.shifts
+        .filter((shift) => getEmployee(shift.employeeId) && !hasEmployeeShiftOnDate(shift.employeeId, selectedDate))
+        .map((shift) => createShift(shift));
+
+    if (!additions.length) {
+        dom.shiftFormMessage.textContent = "No shifts pasted because everyone copied is already scheduled that day.";
+        renderShiftEmployeeOptions();
+        return;
+    }
+
+    state.shifts[selectedDate] = [...(state.shifts[selectedDate] || []), ...additions];
+    saveState();
+    dom.shiftFormMessage.textContent = `Pasted ${additions.length} ${additions.length === 1 ? "shift" : "shifts"} into ${longDate(selectedDate)}.`;
+    renderManagerSchedule();
+}
+
+function copySelectedWeek() {
+    const manager = getCurrentManagerConfig();
+    const week = getWeekDates(parseDate(selectedDate));
+    copiedWeekShifts = {
+        sourceStart: formatDate(week[0]),
+        days: week.map((date) => ({
+            offset: date.getDay(),
+            shifts: getDateShiftsForArea(formatDate(date), manager.area, state.shifts).map((shift) => cloneShift(shift))
+        }))
+    };
+    const copiedCount = copiedWeekShifts.days.reduce((sum, day) => sum + day.shifts.length, 0);
+    dom.shiftFormMessage.textContent = `${copiedCount} ${copiedCount === 1 ? "shift" : "shifts"} copied from the week of ${formatPrintDate(week[0])}.`;
+    renderScheduleWorkflow();
+}
+
+function pasteCopiedWeek() {
+    if (!copiedWeekShifts) return;
+    const targetWeek = getWeekDates(parseDate(selectedDate));
+    let pasted = 0;
+
+    copiedWeekShifts.days.forEach((day) => {
+        const targetDateKey = formatDate(targetWeek[day.offset]);
+        const additions = day.shifts
+            .filter((shift) => getEmployee(shift.employeeId) && !hasEmployeeShiftOnDate(shift.employeeId, targetDateKey))
+            .map((shift) => createShift(shift));
+        if (!additions.length) return;
+        state.shifts[targetDateKey] = [...(state.shifts[targetDateKey] || []), ...additions];
+        pasted += additions.length;
+    });
+
+    saveState();
+    dom.shiftFormMessage.textContent = pasted
+        ? `Pasted ${pasted} ${pasted === 1 ? "shift" : "shifts"} into the selected week.`
+        : "No shifts pasted because the copied employees were already scheduled.";
+    renderManagerSchedule();
+}
+
+function exportPayrollCsv() {
+    const manager = getCurrentManagerConfig();
+    const employees = getManagerEmployees();
+    const employeeIds = new Set(employees.map((employee) => employee.id));
+    const rows = [[
+        "Type",
+        "Employee",
+        "Area",
+        "Category",
+        "Date",
+        "Start",
+        "End",
+        "Role",
+        "Hours",
+        "Public note"
+    ]];
+
+    Object.entries(state.shifts)
+        .filter(([dateKey]) => isSameMonth(parseDate(dateKey), currentMonth))
+        .sort(([firstDate], [secondDate]) => firstDate.localeCompare(secondDate))
+        .forEach(([dateKey, shifts]) => {
+            sortShiftsByStart(shifts.filter((shift) => employeeIds.has(shift.employeeId))).forEach((shift) => {
+                const employee = getEmployee(shift.employeeId);
+                rows.push([
+                    "Shift",
+                    employee ? employee.name : "Removed employee",
+                    manager.label,
+                    employee ? employeeCategoryLabel(employee) : "",
+                    dateKey,
+                    shift.start,
+                    shift.end,
+                    shift.role || (employee ? employee.role : ""),
+                    formatDecimalHours(getShiftMinutes(shift)),
+                    shift.note || ""
+                ]);
+            });
+        });
+
+    getMonthlyHoursByEmployee(currentMonth, employees).forEach(({ employee, minutes, shifts }) => {
+        rows.push([
+            "Total",
+            employee.name,
+            manager.label,
+            employeeCategoryLabel(employee),
+            "",
+            "",
+            "",
+            `${shifts} ${shifts === 1 ? "shift" : "shifts"}`,
+            formatDecimalHours(minutes),
+            ""
+        ]);
+    });
+
+    const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\n");
+    downloadTextFile(csv, `oak34-${manager.shortLabel.toLowerCase()}-payroll-${formatMonthKey(currentMonth)}.csv`, "text/csv");
+}
+
+function applyShiftTemplate(templateId, target) {
+    const template = getShiftTemplate(templateId);
+    if (!template) return;
+
+    if (target === "builder") {
+        dom.builderShiftRole.value = template.role;
+        dom.builderShiftStart.value = template.start;
+        dom.builderShiftEnd.value = template.end;
+        dom.builderShiftNote.value = template.note;
+        dom.builderShiftPrivateNote.value = template.privateNote || "";
+        return;
+    }
+
+    dom.shiftRole.value = template.role;
+    dom.shiftStart.value = template.start;
+    dom.shiftEnd.value = template.end;
+    dom.shiftNote.value = template.note;
+    dom.shiftPrivateNote.value = template.privateNote || "";
+}
+
+function saveCurrentShiftTemplate() {
+    const manager = getCurrentManagerConfig();
+    const fallbackName = dom.shiftRole.value.trim() || `${dom.shiftStart.value}-${dom.shiftEnd.value}`;
+    const name = window.prompt("Template name", fallbackName);
+    if (!name) return;
+
+    const template = {
+        id: `template-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name: name.trim(),
+        area: manager.area,
+        role: dom.shiftRole.value.trim(),
+        start: dom.shiftStart.value,
+        end: dom.shiftEnd.value,
+        note: dom.shiftNote.value.trim(),
+        privateNote: dom.shiftPrivateNote.value.trim()
+    };
+    state.shiftTemplates.push(template);
+    saveState();
+    renderShiftTemplateOptions();
+    dom.shiftTemplate.value = template.id;
+    dom.shiftFormMessage.textContent = "Template saved.";
+}
+
+function confirmShift(shiftId, employeeId) {
+    if (!state.confirmations[shiftId]) state.confirmations[shiftId] = {};
+    state.confirmations[shiftId][employeeId] = true;
+    saveState();
+    renderEmployeeAvailability();
+}
+
+function requestShiftSwap(shiftId, employeeId) {
+    const existing = getEmployeeSwapRequest(shiftId, employeeId);
+    if (existing) return;
+    const request = {
+        id: `swap-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        shiftId,
+        employeeId,
+        dateKey: selectedDate,
+        message: "",
+        status: "pending",
+        createdAt: new Date().toISOString()
+    };
+    state.swapRequests.push(request);
+    saveState();
+    renderEmployeeAvailability();
+}
+
+function updateSwapRequestStatus(requestId, status) {
+    const request = state.swapRequests.find((item) => item.id === requestId);
+    if (!request || !["approved", "denied"].includes(status)) return;
+    request.status = status;
+    saveState();
+    renderManagerSchedule();
+}
+
+function getScheduleWarnings(dateKey) {
+    const manager = getCurrentManagerConfig();
+    const employees = getManagerEmployees();
+    const employeeMap = new Map(employees.map((employee) => [employee.id, employee]));
+    const shifts = getDateShiftsForArea(dateKey, manager.area, state.shifts);
+    const warnings = [];
+    const duplicateNames = [];
+    const unavailableNames = [];
+    const noAvailabilityNames = [];
+    const invalidTimeNames = [];
+    const quickTurnaroundNames = [];
+    const countsByEmployee = shifts.reduce((map, shift) => {
+        map.set(shift.employeeId, (map.get(shift.employeeId) || 0) + 1);
+        return map;
+    }, new Map());
+
+    countsByEmployee.forEach((count, employeeId) => {
+        if (count > 1) {
+            const employee = employeeMap.get(employeeId);
+            duplicateNames.push(employee ? employee.name : "Removed employee");
+        }
+    });
+
+    shifts.forEach((shift) => {
+        const employee = employeeMap.get(shift.employeeId);
+        const name = employee ? employee.name : "Removed employee";
+        const availability = getAvailability(shift.employeeId, dateKey);
+        if (!employee) warnings.push({ title: "Removed employee on schedule", detail: "A shift is assigned to someone no longer in this team.", severity: "danger", icon: "user-x" });
+        if (availability && availability.status === "unavailable") unavailableNames.push(name);
+        if (!availability) noAvailabilityNames.push(name);
+        if (!getShiftMinutes(shift)) invalidTimeNames.push(name);
+        if (hasShortTurnaround(shift, dateKey)) quickTurnaroundNames.push(name);
+    });
+
+    if (!arePublishedShiftsCurrent(manager.area, currentMonth)) {
+        warnings.push({
+            title: "Unpublished changes",
+            detail: "Employees will not see this draft until you publish the month.",
+            severity: "notice",
+            icon: "send"
+        });
+    }
+
+    if (duplicateNames.length) warnings.push({
+        title: "Double shift on one day",
+        detail: `${formatNameList(duplicateNames)} ${duplicateNames.length === 1 ? "has" : "have"} more than one shift today.`,
+        severity: "danger",
+        icon: "copy-x"
+    });
+    if (unavailableNames.length) warnings.push({
+        title: "Scheduled while unavailable",
+        detail: formatNameList(unavailableNames),
+        severity: "danger",
+        icon: "calendar-x"
+    });
+    if (noAvailabilityNames.length) warnings.push({
+        title: "No availability entered",
+        detail: formatNameList(noAvailabilityNames),
+        severity: "notice",
+        icon: "calendar-question"
+    });
+    if (invalidTimeNames.length) warnings.push({
+        title: "Check shift times",
+        detail: formatNameList(invalidTimeNames),
+        severity: "danger",
+        icon: "clock-alert"
+    });
+    if (quickTurnaroundNames.length) warnings.push({
+        title: "Short turnaround",
+        detail: `${formatNameList(quickTurnaroundNames)} ${quickTurnaroundNames.length === 1 ? "has" : "have"} less than 10 hours between shifts.`,
+        severity: "notice",
+        icon: "timer-reset"
+    });
+
+    const pendingSwapCount = shifts.reduce((count, shift) => (
+        count + getSwapRequestsForShift(shift.id).filter((request) => request.status === "pending").length
+    ), 0);
+    if (pendingSwapCount) warnings.push({
+        title: "Swap requests waiting",
+        detail: `${pendingSwapCount} pending ${pendingSwapCount === 1 ? "request" : "requests"} for this day.`,
+        severity: "notice",
+        icon: "repeat-2"
+    });
+
+    getCoverageWarnings(dateKey, manager.area).forEach((warning) => warnings.push(warning));
+    return warnings;
 }
 
 function changeMonth(delta) {
@@ -1784,19 +2482,255 @@ function getAvailability(employeeId, dateKey) {
     return state.availability[employeeId] ? state.availability[employeeId][dateKey] : null;
 }
 
-function hasEmployeeShiftOnDate(employeeId, dateKey) {
-    return (state.shifts[dateKey] || []).some((shift) => shift.employeeId === employeeId);
+function hasEmployeeShiftOnDate(employeeId, dateKey, shiftsByDate = state.shifts) {
+    return (shiftsByDate[dateKey] || []).some((shift) => shift.employeeId === employeeId);
 }
 
-function createShift({ employeeId, start, end, role, note }) {
+function createShift({ employeeId, start, end, role, note, privateNote }) {
     return {
         id: `shift-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         employeeId,
         start,
         end,
         role,
-        note
+        note,
+        privateNote: privateNote || ""
     };
+}
+
+function cloneShift(shift, options = {}) {
+    const normalized = normalizeShift(shift);
+    return {
+        ...normalized,
+        id: options.keepId ? normalized.id : `shift-${Date.now()}-${Math.random().toString(16).slice(2)}`
+    };
+}
+
+function getDateShiftsForArea(dateKey, area, shiftsByDate = state.shifts) {
+    return sortShiftsByStart((shiftsByDate[dateKey] || []).filter((shift) => {
+        const employee = getEmployee(shift.employeeId);
+        return employee && getEmployeeArea(employee) === area;
+    }));
+}
+
+function getAreaMonthShifts(shiftsByDate, area, monthDate) {
+    return Object.entries(shiftsByDate || {}).flatMap(([dateKey, shifts]) => {
+        if (!isSameMonth(parseDate(dateKey), monthDate)) return [];
+        return getDateShiftsForArea(dateKey, area, { [dateKey]: shifts })
+            .map((shift) => ({ ...shift, dateKey }));
+    });
+}
+
+function getPublishKey(area, monthDate) {
+    return `${area}-${formatMonthKey(monthDate)}`;
+}
+
+function arePublishedShiftsCurrent(area, monthDate) {
+    return getShiftSignature(getAreaMonthShifts(state.shifts, area, monthDate))
+        === getShiftSignature(getAreaMonthShifts(state.publishedShifts, area, monthDate));
+}
+
+function getShiftSignature(shifts) {
+    return shifts.map((shift) => [
+        shift.dateKey,
+        shift.employeeId,
+        shift.start,
+        shift.end,
+        shift.role || "",
+        shift.note || "",
+        shift.privateNote || ""
+    ].join("|")).sort().join("\n");
+}
+
+function pruneShiftTracking() {
+    const publishedShiftIds = new Set(Object.values(state.publishedShifts).flatMap((shifts) => shifts.map((shift) => shift.id)));
+    Object.keys(state.confirmations).forEach((shiftId) => {
+        if (!publishedShiftIds.has(shiftId)) delete state.confirmations[shiftId];
+    });
+    state.swapRequests = state.swapRequests.filter((request) => publishedShiftIds.has(request.shiftId));
+}
+
+function getWeekDates(date) {
+    const start = new Date(date);
+    start.setDate(date.getDate() - date.getDay());
+    return Array.from({ length: 7 }, (_, index) => addDays(start, index));
+}
+
+function addDays(date, days) {
+    const next = new Date(date);
+    next.setDate(date.getDate() + days);
+    return next;
+}
+
+function getWeekMinutesForEmployee(employeeId, week, shiftsByDate = state.shifts) {
+    return week.reduce((sum, date) => {
+        const dateKey = formatDate(date);
+        return sum + getEmployeeShiftsForDate(employeeId, dateKey, shiftsByDate)
+            .reduce((daySum, shift) => daySum + getShiftMinutes(shift), 0);
+    }, 0);
+}
+
+function getCoverageTargetGroups(area) {
+    return area === "boh"
+        ? kitchenCategories
+        : [{ id: "foh", label: "Front of House" }];
+}
+
+function getCoverageTargets(dateKey, area) {
+    return state.coverageTargets[dateKey] && state.coverageTargets[dateKey][area]
+        ? state.coverageTargets[dateKey][area]
+        : {};
+}
+
+function getCoverageCounts(dateKey, area, shiftsByDate = state.shifts) {
+    const counts = getCoverageTargetGroups(area).reduce((nextCounts, group) => {
+        nextCounts[group.id] = 0;
+        return nextCounts;
+    }, {});
+
+    getDateShiftsForArea(dateKey, area, shiftsByDate).forEach((shift) => {
+        const employee = getEmployee(shift.employeeId);
+        const key = area === "boh" ? getEmployeeCategory(employee) : "foh";
+        counts[key] = (counts[key] || 0) + 1;
+    });
+
+    return counts;
+}
+
+function getCoverageWarnings(dateKey, area) {
+    const targets = getCoverageTargets(dateKey, area);
+    const counts = getCoverageCounts(dateKey, area);
+    return getCoverageTargetGroups(area).flatMap((group) => {
+        const target = targets[group.id] || 0;
+        const count = counts[group.id] || 0;
+        if (!target || count === target) return [];
+        if (count < target) {
+            return [{
+                title: `${group.label} coverage low`,
+                detail: `${count}/${target} scheduled for ${longDate(dateKey)}.`,
+                severity: "danger",
+                icon: "users"
+            }];
+        }
+        return [{
+            title: `${group.label} over target`,
+            detail: `${count}/${target} scheduled for ${longDate(dateKey)}.`,
+            severity: "notice",
+            icon: "user-plus"
+        }];
+    });
+}
+
+function formatCoverageTargetSummary(dateKey, area) {
+    const targets = getCoverageTargets(dateKey, area);
+    const counts = getCoverageCounts(dateKey, area);
+    const parts = getCoverageTargetGroups(area)
+        .filter((group) => targets[group.id] || counts[group.id])
+        .map((group) => `${group.label}: ${counts[group.id] || 0}/${targets[group.id] || 0}`);
+    return parts.length ? parts.join(" | ") : "-";
+}
+
+function getShiftTemplatesForArea(area) {
+    return state.shiftTemplates.filter((template) => template.area === area || template.area === "all");
+}
+
+function getShiftTemplate(templateId) {
+    return state.shiftTemplates.find((template) => template.id === templateId);
+}
+
+function isShiftConfirmed(shiftId, employeeId) {
+    return Boolean(state.confirmations[shiftId] && state.confirmations[shiftId][employeeId]);
+}
+
+function getSwapRequestsForShift(shiftId) {
+    return state.swapRequests.filter((request) => request.shiftId === shiftId);
+}
+
+function getEmployeeSwapRequest(shiftId, employeeId) {
+    return state.swapRequests.find((request) => request.shiftId === shiftId && request.employeeId === employeeId);
+}
+
+function renderEmployeeShiftMeta(shift, employee) {
+    const details = [isShiftConfirmed(shift.id, employee.id) ? "Confirmed" : "Needs confirmation"];
+    const swapRequest = getEmployeeSwapRequest(shift.id, employee.id);
+    if (swapRequest) details.push(`Swap ${swapRequest.status}`);
+    return `<small>${escapeHtml(details.join(" | "))}</small>`;
+}
+
+function renderManagerShiftMeta(shift, employee) {
+    const details = [];
+    if (shift.note) details.push(`Note: ${shift.note}`);
+    if (shift.privateNote) details.push(`Private: ${shift.privateNote}`);
+    if (employee) details.push(isShiftConfirmed(shift.id, employee.id) ? "Confirmed" : "Not confirmed");
+    const swapRequests = getSwapRequestsForShift(shift.id);
+    if (swapRequests.length) {
+        const pending = swapRequests.filter((request) => request.status === "pending").length;
+        const resolved = swapRequests.length - pending;
+        details.push(`${pending} pending swap${pending === 1 ? "" : "s"}${resolved ? `, ${resolved} resolved` : ""}`);
+    }
+    return details.length ? `<small>${escapeHtml(details.join(" | "))}</small>` : "";
+}
+
+function hasShortTurnaround(shift, dateKey) {
+    const current = getShiftDateTimes(dateKey, shift);
+    if (!current) return false;
+    const employeeShifts = Object.entries(state.shifts).flatMap(([entryDateKey, shifts]) => (
+        shifts
+            .filter((entryShift) => entryShift.employeeId === shift.employeeId)
+            .map((entryShift) => ({ shift: entryShift, dateKey: entryDateKey, range: getShiftDateTimes(entryDateKey, entryShift) }))
+            .filter((entry) => entry.range)
+    )).sort((first, second) => first.range.start - second.range.start);
+
+    const index = employeeShifts.findIndex((entry) => entry.shift.id === shift.id && entry.dateKey === dateKey);
+    if (index === -1) return false;
+
+    const minGap = 10 * 60 * 1000 * 60;
+    const previous = employeeShifts[index - 1];
+    const next = employeeShifts[index + 1];
+    return Boolean(
+        (previous && current.start - previous.range.end < minGap)
+        || (next && next.range.start - current.end < minGap)
+    );
+}
+
+function getShiftDateTimes(dateKey, shift) {
+    const startMinutes = timeToMinutes(shift.start);
+    const endMinutes = timeToMinutes(shift.end);
+    if (startMinutes === null || endMinutes === null || startMinutes === endMinutes) return null;
+
+    const start = parseDate(dateKey);
+    start.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
+    const end = parseDate(dateKey);
+    end.setHours(Math.floor(endMinutes / 60), endMinutes % 60, 0, 0);
+    if (end <= start) end.setDate(end.getDate() + 1);
+    return { start, end };
+}
+
+function formatNameList(names) {
+    const uniqueNames = [...new Set(names)].filter(Boolean);
+    if (uniqueNames.length <= 4) return uniqueNames.join(", ");
+    return `${uniqueNames.slice(0, 4).join(", ")} and ${uniqueNames.length - 4} more`;
+}
+
+function formatDecimalHours(minutes) {
+    return (minutes / 60).toFixed(2);
+}
+
+function escapeCsv(value) {
+    const text = String(value ?? "");
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadTextFile(contents, filename, type) {
+    const blob = new Blob([contents], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
 }
 
 function getAvailabilitySummary(dateKey, employees = state.employees) {
@@ -1807,16 +2741,16 @@ function getAvailabilitySummary(dateKey, employees = state.employees) {
     }, { available: 0, maybe: 0, unavailable: 0 });
 }
 
-function getMonthlyHoursByEmployee(monthDate, employees = state.employees) {
+function getMonthlyHoursByEmployee(monthDate, employees = state.employees, shiftsByDate = state.shifts) {
     return employees.map((employee) => ({
         employee,
-        minutes: getEmployeeMonthlyMinutes(employee.id, monthDate),
-        shifts: getEmployeeMonthlyShiftCount(employee.id, monthDate)
+        minutes: getEmployeeMonthlyMinutes(employee.id, monthDate, shiftsByDate),
+        shifts: getEmployeeMonthlyShiftCount(employee.id, monthDate, shiftsByDate)
     }));
 }
 
-function getEmployeeMonthlyMinutes(employeeId, monthDate) {
-    return Object.entries(state.shifts).reduce((total, [dateKey, shifts]) => {
+function getEmployeeMonthlyMinutes(employeeId, monthDate, shiftsByDate = state.shifts) {
+    return Object.entries(shiftsByDate).reduce((total, [dateKey, shifts]) => {
         if (!isSameMonth(parseDate(dateKey), monthDate)) return total;
         return total + shifts
             .filter((shift) => shift.employeeId === employeeId)
@@ -1824,8 +2758,8 @@ function getEmployeeMonthlyMinutes(employeeId, monthDate) {
     }, 0);
 }
 
-function getEmployeeMonthlyShiftCount(employeeId, monthDate) {
-    return Object.entries(state.shifts).reduce((count, [dateKey, shifts]) => {
+function getEmployeeMonthlyShiftCount(employeeId, monthDate, shiftsByDate = state.shifts) {
+    return Object.entries(shiftsByDate).reduce((count, [dateKey, shifts]) => {
         if (!isSameMonth(parseDate(dateKey), monthDate)) return count;
         return count + shifts.filter((shift) => shift.employeeId === employeeId).length;
     }, 0);
@@ -1838,17 +2772,17 @@ function getShiftMinutes(shift) {
     return end > start ? end - start : end + 24 * 60 - start;
 }
 
-function getShiftStatsForDates(dateKeys, employees) {
+function getShiftStatsForDates(dateKeys, employees, shiftsByDate = state.shifts) {
     const employeeIds = new Set(employees.map((employee) => employee.id));
-    const shifts = dateKeys.flatMap((dateKey) => (state.shifts[dateKey] || []).filter((shift) => employeeIds.has(shift.employeeId)));
+    const shifts = dateKeys.flatMap((dateKey) => (shiftsByDate[dateKey] || []).filter((shift) => employeeIds.has(shift.employeeId)));
     return {
         shifts: shifts.length,
         minutes: shifts.reduce((sum, shift) => sum + getShiftMinutes(shift), 0)
     };
 }
 
-function getEmployeeShiftsForDate(employeeId, dateKey) {
-    return sortShiftsByStart((state.shifts[dateKey] || []).filter((shift) => shift.employeeId === employeeId));
+function getEmployeeShiftsForDate(employeeId, dateKey, shiftsByDate = state.shifts) {
+    return sortShiftsByStart((shiftsByDate[dateKey] || []).filter((shift) => shift.employeeId === employeeId));
 }
 
 function sortShiftsByStart(shifts) {
@@ -1925,6 +2859,23 @@ function formatDate(date) {
 
 function monthTitle(date) {
     return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(date);
+}
+
+function formatMonthKey(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${year}-${month}`;
+}
+
+function formatDateTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "recently";
+    return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+    }).format(date);
 }
 
 function longDate(dateKey) {

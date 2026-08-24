@@ -507,6 +507,91 @@ select:focus {
     gap: 1rem;
 }
 
+.workflow-strip {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 0.9rem;
+    border: 1px solid rgba(157, 52, 72, 0.2);
+    border-radius: 8px;
+    background: rgba(157, 52, 72, 0.07);
+}
+
+.workflow-strip h2,
+.week-builder-head h2,
+.coverage-head h3 {
+    margin: 0;
+    line-height: 1.12;
+}
+
+.workflow-strip h2 {
+    font-size: 1.2rem;
+}
+
+.workflow-note {
+    display: block;
+    margin-top: 0.35rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.workflow-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.warning-list {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.warning-list:not(:empty) {
+    margin-bottom: 1rem;
+}
+
+.schedule-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.72rem;
+    border: 1px solid rgba(255, 149, 0, 0.28);
+    border-radius: 8px;
+    background: rgba(255, 149, 0, 0.1);
+    color: #7a4300;
+}
+
+.schedule-warning.danger {
+    border-color: rgba(255, 59, 48, 0.25);
+    background: rgba(255, 59, 48, 0.09);
+    color: #9a261f;
+}
+
+.schedule-warning svg {
+    flex: 0 0 auto;
+    margin-top: 0.05rem;
+}
+
+.schedule-warning div {
+    display: grid;
+    gap: 0.15rem;
+}
+
+.schedule-warning strong {
+    font-size: 0.84rem;
+    font-weight: 900;
+}
+
+.schedule-warning span {
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
 .calendar-surface,
 .day-panel,
 .employee-form {
@@ -625,6 +710,166 @@ select:focus {
 
 .month-grid {
     gap: 0.35rem;
+}
+
+.week-builder {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+}
+
+.week-builder-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.week-builder-head h2 {
+    font-size: 1.25rem;
+}
+
+.week-builder-head span {
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.week-builder-grid {
+    display: grid;
+    gap: 0.22rem;
+    max-height: 520px;
+    overflow: auto;
+    padding: 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.48);
+}
+
+.week-builder-corner,
+.week-builder-day,
+.week-builder-employee,
+.week-builder-cell {
+    min-height: 42px;
+    border-radius: 6px;
+}
+
+.week-builder-corner,
+.week-builder-day {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+}
+
+.week-builder-corner {
+    left: 0;
+    z-index: 4;
+    background: rgba(255, 255, 255, 0.96);
+}
+
+.week-builder-day,
+.week-builder-cell {
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.74);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.week-builder-day {
+    display: grid;
+    place-items: center;
+    gap: 0.05rem;
+    font-weight: 900;
+}
+
+.week-builder-day span {
+    color: var(--muted);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+}
+
+.week-builder-day.selected,
+.week-builder-cell.selected-column {
+    border-color: rgba(157, 52, 72, 0.62);
+    background: rgba(157, 52, 72, 0.1);
+}
+
+.week-builder-group {
+    grid-column: 1 / -1;
+    padding: 0.45rem 0.55rem;
+    border-radius: 6px;
+    background: rgba(157, 52, 72, 0.08);
+    color: var(--blue);
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.week-builder-employee {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    display: grid;
+    align-content: center;
+    gap: 0.12rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 8px 0 18px rgba(245, 245, 247, 0.9);
+}
+
+.week-builder-employee strong,
+.week-builder-employee span,
+.week-builder-cell span,
+.week-builder-cell small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.week-builder-employee strong {
+    font-size: 0.78rem;
+    font-weight: 900;
+}
+
+.week-builder-employee span {
+    color: var(--muted);
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+.week-builder-cell {
+    display: grid;
+    align-content: center;
+    gap: 0.18rem;
+    min-width: 0;
+    padding: 0.35rem;
+    text-align: left;
+}
+
+.week-builder-cell.scheduled {
+    border-color: rgba(157, 52, 72, 0.28);
+    background: rgba(157, 52, 72, 0.09);
+    color: var(--blue);
+}
+
+.week-builder-cell.available small {
+    color: var(--green);
+}
+
+.week-builder-cell.maybe small {
+    color: var(--orange);
+}
+
+.week-builder-cell.unavailable small {
+    color: var(--red);
+}
+
+.week-builder-cell span,
+.week-builder-cell small {
+    font-size: 0.7rem;
+    font-weight: 900;
 }
 
 .day-cell {
@@ -808,6 +1053,76 @@ select:focus {
     font-size: 1.35rem;
 }
 
+.coverage-panel {
+    display: grid;
+    gap: 0.65rem;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.coverage-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.coverage-head h3 {
+    font-size: 1rem;
+}
+
+.coverage-grid {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.coverage-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 78px;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.68);
+}
+
+.coverage-item.low {
+    border-color: rgba(255, 59, 48, 0.22);
+    background: rgba(255, 59, 48, 0.07);
+}
+
+.coverage-item.high {
+    border-color: rgba(255, 149, 0, 0.24);
+    background: rgba(255, 149, 0, 0.08);
+}
+
+.coverage-item span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    font-weight: 900;
+}
+
+.coverage-item input {
+    min-height: 34px;
+    padding: 0.35rem 0.45rem;
+    text-align: center;
+    font-weight: 900;
+}
+
+.coverage-item small {
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
 .availability-list,
 .shift-list,
 .employee-list {
@@ -894,7 +1209,38 @@ select:focus {
     padding: 0.7rem;
 }
 
-.mini-shift button {
+.manager-shift-card,
+.employee-shift-card {
+    align-items: flex-start;
+}
+
+.manager-shift-card > span,
+.employee-shift-card > span {
+    display: grid;
+    gap: 0.16rem;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+}
+
+.mini-shift small {
+    display: block;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 0.66rem;
+    font-weight: 750;
+    line-height: 1.25;
+    white-space: normal;
+}
+
+.mini-shift-actions {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 0.28rem;
+}
+
+.mini-shift button,
+.mini-shift-actions button {
     flex: 0 0 auto;
     width: 30px;
     height: 30px;
@@ -902,6 +1248,12 @@ select:focus {
     background: rgba(255, 255, 255, 0.24);
     color: white;
     cursor: pointer;
+}
+
+.mini-shift button:disabled,
+.mini-shift-actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.72;
 }
 
 .segmented-control {
@@ -1069,7 +1421,7 @@ select:focus {
 }
 
 .builder-shift-fields {
-    grid-template-columns: minmax(180px, 1.5fr) repeat(2, minmax(120px, 0.8fr)) minmax(180px, 1.5fr);
+    grid-template-columns: minmax(150px, 1.15fr) minmax(150px, 1.15fr) repeat(2, minmax(110px, 0.7fr)) minmax(160px, 1fr) minmax(160px, 1fr);
 }
 
 .builder-selection-head {
@@ -1507,7 +1859,9 @@ svg {
     .planner-head,
     .matrix-head,
     .builder-head,
-    .builder-toolbar {
+    .builder-toolbar,
+    .workflow-strip,
+    .week-builder-head {
         display: grid;
     }
 
@@ -1564,8 +1918,13 @@ svg {
 
     .builder-day-controls,
     .builder-actions,
-    .filter-tabs {
+    .filter-tabs,
+    .workflow-actions {
         justify-content: flex-start;
+    }
+
+    .week-builder-grid {
+        max-height: 420px;
     }
 
     .builder-person {
@@ -1612,7 +1971,11 @@ svg {
     .matrix-scroll-controls,
     .availability-form,
     .shift-form,
-    .availability-builder {
+    .availability-builder,
+    .workflow-strip,
+    .warning-list,
+    .week-builder,
+    .coverage-panel {
         display: none !important;
     }
 
