@@ -343,7 +343,7 @@ function updateSessionUi() {
         dom.profileAvatar.textContent = "M";
         dom.profileAvatar.style.background = "#1d1d1f";
         dom.profileName.textContent = "Manager";
-        dom.profileRole.textContent = "Schedule manager";
+        dom.profileRole.textContent = "Kitchen schedule manager";
         dom.sessionPill.textContent = "Manager";
         return;
     }
@@ -382,10 +382,10 @@ function renderActiveView() {
     });
 
     const titles = {
-        schedule: ["Manager", "Schedule"],
-        employeeAvailability: ["Employee", "My Month"],
-        managerAvailability: ["Manager", "Availability"],
-        employees: ["Manager", "Employees"]
+        schedule: ["Oak34", "Kitchen Schedule"],
+        employeeAvailability: ["Oak34", "My Month"],
+        managerAvailability: ["Oak34", "Availability"],
+        employees: ["Oak34", "Employees"]
     };
     const [eyebrow, title] = titles[activeView] || titles.schedule;
     dom.surfaceEyebrow.textContent = eyebrow;
@@ -409,10 +409,10 @@ function setActiveView(view) {
 
 function renderPrintHeading() {
     const titleMap = {
-        schedule: "Team Schedule",
-        employeeAvailability: "My Schedule",
-        managerAvailability: "Team Availability",
-        employees: "Employees"
+        schedule: "Oak34 Kitchen Schedule",
+        employeeAvailability: "Oak34 Kitchen Schedule",
+        managerAvailability: "Oak34 Kitchen Availability",
+        employees: "Oak34 Kitchen Team"
     };
     dom.printHeading.textContent = `${titleMap[activeView] || "Calendar"} - ${monthTitle(currentMonth)}`;
 }
@@ -420,7 +420,7 @@ function renderPrintHeading() {
 function exportCurrentViewAsPdf() {
     previousDocumentTitle = document.title;
     document.body.classList.add("pdf-exporting");
-    document.title = `${(dom.printHeading.textContent || "Team Schedule").replace(/\s+/g, "-")}`;
+    document.title = `${(dom.printHeading.textContent || "Oak34 Kitchen Schedule").replace(/\s+/g, "-")}`;
     renderActiveView();
     setTimeout(() => window.print(), 80);
 }

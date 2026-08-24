@@ -7,11 +7,13 @@
     --text: #1d1d1f;
     --muted: #6e6e73;
     --muted-2: #8e8e93;
-    --blue: #007aff;
+    --blue: #9d3448;
     --green: #34c759;
     --orange: #ff9500;
     --red: #ff3b30;
     --purple: #af52de;
+    --oak34-red: #9d3448;
+    --oak34-logo: url("assets/oak34-logo.png");
     --shadow: 0 18px 55px rgba(20, 23, 31, 0.12);
 }
 
@@ -20,15 +22,29 @@
 }
 
 body {
+    position: relative;
     margin: 0;
     min-height: 100vh;
     background:
-        linear-gradient(135deg, rgba(255,255,255,0.94), rgba(239,241,245,0.94)),
-        radial-gradient(circle at 16% 18%, rgba(0,122,255,0.14), transparent 28%),
-        radial-gradient(circle at 86% 10%, rgba(255,149,0,0.14), transparent 25%),
-        radial-gradient(circle at 78% 82%, rgba(52,199,89,0.13), transparent 28%);
+        linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 243, 241, 0.95)),
+        radial-gradient(circle at 16% 18%, rgba(157, 52, 72, 0.14), transparent 28%),
+        radial-gradient(circle at 88% 12%, rgba(255, 149, 0, 0.09), transparent 26%),
+        radial-gradient(circle at 80% 84%, rgba(157, 52, 72, 0.1), transparent 30%);
     color: var(--text);
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    right: clamp(1.25rem, 6vw, 5rem);
+    bottom: clamp(1rem, 6vh, 4.5rem);
+    z-index: 0;
+    width: clamp(190px, 28vw, 340px);
+    height: clamp(250px, 37vw, 454px);
+    background: var(--oak34-logo) center / contain no-repeat;
+    opacity: 0.08;
+    pointer-events: none;
 }
 
 button,
@@ -47,6 +63,8 @@ a {
 }
 
 .app-shell {
+    position: relative;
+    z-index: 1;
     min-height: 100vh;
 }
 
@@ -59,7 +77,7 @@ a {
     justify-content: space-between;
     gap: 1rem;
     padding: 1rem 1.5rem;
-    background: rgba(245, 245, 247, 0.78);
+    background: rgba(250, 247, 245, 0.82);
     border-bottom: 1px solid rgba(60, 60, 67, 0.1);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
@@ -89,6 +107,16 @@ a {
     border-radius: 8px;
     background: #1d1d1f;
     color: white;
+}
+
+.oak-logo-mark {
+    background-color: rgba(255, 255, 255, 0.94);
+    background-image: var(--oak34-logo);
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 72% auto;
+    border: 1px solid rgba(157, 52, 72, 0.2);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
 }
 
 .topbar-actions,
@@ -158,8 +186,13 @@ a {
     height: 48px;
     margin-bottom: 1.5rem;
     border-radius: 8px;
-    background: rgba(0, 122, 255, 0.12);
+    background: rgba(157, 52, 72, 0.12);
     color: var(--blue);
+}
+
+.login-mark.oak-logo-mark {
+    background-color: rgba(255, 255, 255, 0.9);
+    background-size: 66% auto;
 }
 
 .eyebrow {
@@ -231,8 +264,8 @@ input::placeholder {
 
 input:focus,
 select:focus {
-    border-color: rgba(0, 122, 255, 0.75);
-    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.12);
+    border-color: rgba(157, 52, 72, 0.75);
+    box-shadow: 0 0 0 4px rgba(157, 52, 72, 0.12);
     background: white;
 }
 
@@ -383,7 +416,7 @@ select:focus {
 }
 
 .side-nav-item.active {
-    background: rgba(0, 122, 255, 0.1);
+    background: rgba(157, 52, 72, 0.1);
     color: var(--blue);
 }
 
@@ -497,8 +530,8 @@ select:focus {
 
 .employee-total-card {
     margin-bottom: 1rem;
-    background: rgba(0, 122, 255, 0.1);
-    border-color: rgba(0, 122, 255, 0.22);
+    background: rgba(157, 52, 72, 0.1);
+    border-color: rgba(157, 52, 72, 0.22);
 }
 
 .hours-name,
@@ -586,8 +619,8 @@ select:focus {
 }
 
 .day-cell.selected {
-    border-color: rgba(0, 122, 255, 0.78);
-    box-shadow: inset 0 0 0 1px rgba(0, 122, 255, 0.78);
+    border-color: rgba(157, 52, 72, 0.78);
+    box-shadow: inset 0 0 0 1px rgba(157, 52, 72, 0.78);
 }
 
 .day-cell.today .day-number {
