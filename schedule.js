@@ -808,9 +808,7 @@ function updatePremiumLoader(progress, logoPieces, finalLogo, pieceMotion, prefe
         piece.style.opacity = String(1 - (0.46 * scatter));
     });
 
-    if (finalLogo) {
-        finalLogo.style.opacity = String(clamp01((progress - 0.9) / 0.1));
-    }
+    if (finalLogo) finalLogo.style.opacity = "0";
 }
 
 function waitForFonts() {
