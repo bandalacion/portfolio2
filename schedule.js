@@ -92,6 +92,7 @@ const dom = {};
 
 document.addEventListener("DOMContentLoaded", () => {
     captureDom();
+    prepareFloatingShiftPopover();
     bindEvents();
     render();
     hydrateRemoteState().finally(hideLoadingScreen);
@@ -276,6 +277,10 @@ function bindEvents() {
     window.addEventListener("keydown", handleGlobalKeydown);
     window.addEventListener("afterprint", cleanupPdfExport);
     window.addEventListener("resize", updateScrollControls);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", updateShiftPopoverPosition);
+        window.visualViewport.addEventListener("scroll", updateShiftPopoverPosition);
+    }
 
     document.querySelectorAll(".side-nav-item").forEach((button) => {
         button.addEventListener("click", () => {
@@ -289,6 +294,15 @@ function bindEvents() {
             renderAvailabilityForm();
         });
     });
+}
+
+function prepareFloatingShiftPopover() {
+    if (!dom.shiftPopover || dom.shiftPopover.parentElement === document.body) return;
+    document.body.appendChild(dom.shiftPopover);
+}
+
+function updateShiftPopoverPosition() {
+    if (activeShiftEditor) positionShiftPopover(activeShiftEditor.anchor);
 }
 
 function loadState() {
@@ -2232,8 +2246,10 @@ function openShiftPopover(employeeId, dateKey, anchor) {
     dom.shiftPopoverMessage.textContent = "";
     dom.removePopoverShiftBtn.hidden = !shift;
     dom.shiftPopover.hidden = false;
-    positionShiftPopover(anchor);
-    requestAnimationFrame(() => dom.popoverShiftStart.focus());
+    requestAnimationFrame(() => {
+        positionShiftPopover(anchor);
+        dom.popoverShiftStart.focus();
+    });
     refreshIcons();
 }
 
@@ -2312,13 +2328,24 @@ function positionShiftPopover(anchor) {
     const anchorRect = anchor.getBoundingClientRect();
     const popoverRect = dom.shiftPopover.getBoundingClientRect();
     const gap = 8;
+    const margin = 12;
+    const viewport = window.visualViewport;
+    const viewportLeft = viewport ? viewport.offsetLeft : 0;
+    const viewportTop = viewport ? viewport.offsetTop : 0;
+    const viewportWidth = viewport ? viewport.width : window.innerWidth;
+    const viewportHeight = viewport ? viewport.height : window.innerHeight;
+    const minLeft = viewportLeft + margin;
+    const maxLeft = Math.max(minLeft, viewportLeft + viewportWidth - popoverRect.width - margin);
+    const minTop = viewportTop + margin;
+    const maxTop = Math.max(minTop, viewportTop + viewportHeight - popoverRect.height - margin);
     let left = anchorRect.left + (anchorRect.width / 2) - (popoverRect.width / 2);
     let top = anchorRect.bottom + gap;
 
-    left = Math.max(12, Math.min(left, window.innerWidth - popoverRect.width - 12));
-    if (top + popoverRect.height > window.innerHeight - 12) {
-        top = Math.max(12, anchorRect.top - popoverRect.height - gap);
+    left = Math.min(Math.max(left, minLeft), maxLeft);
+    if (top > maxTop) {
+        top = anchorRect.top - popoverRect.height - gap;
     }
+    top = Math.min(Math.max(top, minTop), maxTop);
 
     dom.shiftPopover.style.left = `${left}px`;
     dom.shiftPopover.style.top = `${top}px`;
