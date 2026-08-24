@@ -46,9 +46,9 @@ const stateTemplate = () => ({
         boh: managerAreas.boh.code
     },
     employees: [
-        { id: "emp-alex", name: "Alex Morgan", role: "Chef", code: "ALEX101", color: "#007aff", area: "boh", category: "fulltime" },
-        { id: "emp-mia", name: "Mia Chen", role: "Part-time cook", code: "MIA204", color: "#34c759", area: "boh", category: "parttime-cook" },
-        { id: "emp-noah", name: "Noah Pop", role: "Dishwashing", code: "NOAH315", color: "#ff9500", area: "boh", category: "dishwashing" }
+        { id: "emp-alex", name: "Alex Morgan", role: "Chef", code: "ALEX101", color: "#007aff", area: "boh", category: "fulltime", order: 0 },
+        { id: "emp-mia", name: "Mia Chen", role: "Part-time cook", code: "MIA204", color: "#34c759", area: "boh", category: "parttime-cook", order: 0 },
+        { id: "emp-noah", name: "Noah Pop", role: "Dishwashing", code: "NOAH315", color: "#ff9500", area: "boh", category: "dishwashing", order: 0 }
     ],
     availability: {},
     shifts: {}
@@ -226,7 +226,7 @@ function loadState() {
 
 function normalizeState(nextState) {
     const template = stateTemplate();
-    return {
+    const normalizedState = {
         ...template,
         ...(nextState || {}),
         managerCodes: {
@@ -239,6 +239,8 @@ function normalizeState(nextState) {
         availability: nextState && nextState.availability ? nextState.availability : {},
         shifts: nextState && nextState.shifts ? nextState.shifts : {}
     };
+    normalizeEmployeeOrders(normalizedState.employees);
+    return normalizedState;
 }
 
 function normalizeEmployee(employee) {
@@ -247,11 +249,13 @@ function normalizeEmployee(employee) {
     const category = area === "boh" && isKitchenCategory(employee && employee.category)
         ? employee.category
         : (area === "boh" ? "parttime-cook" : "front-of-house");
+    const order = Number(employee.order);
 
     return {
         ...employee,
         area,
-        category
+        category,
+        order: Number.isFinite(order) ? order : null
     };
 }
 
@@ -335,8 +339,15 @@ function getSortedEmployees(employees, area = "boh") {
             const secondRank = categoryRank.get(getEmployeeCategory(second)) ?? kitchenCategories.length;
             if (firstRank !== secondRank) return firstRank - secondRank;
         }
+        const orderDiff = getEmployeeOrder(first) - getEmployeeOrder(second);
+        if (orderDiff !== 0) return orderDiff;
         return first.name.localeCompare(second.name);
     });
+}
+
+function getEmployeeOrder(employee) {
+    const order = Number(employee && employee.order);
+    return Number.isFinite(order) ? order : Number.MAX_SAFE_INTEGER;
 }
 
 function getGroupedEmployees(employees, area = "boh") {
@@ -346,7 +357,7 @@ function getGroupedEmployees(employees, area = "boh") {
 
     return kitchenCategories.map((category) => ({
         ...category,
-        employees: employees.filter((employee) => getEmployeeCategory(employee) === category.id)
+        employees: getSortedEmployees(employees.filter((employee) => getEmployeeCategory(employee) === category.id), area)
     }));
 }
 
@@ -365,6 +376,27 @@ function getPrintEmployeeGroups(employees, area) {
 
 function chunkArray(items, size) {
     return Array.from({ length: Math.ceil(items.length / size) }, (_, index) => items.slice(index * size, index * size + size));
+}
+
+function normalizeEmployeeOrders(employees = state.employees, areaFilter = null) {
+    const areas = areaFilter ? [areaFilter] : Object.keys(managerAreas);
+    areas.forEach((area) => {
+        const areaEmployees = employees.filter((employee) => getEmployeeArea(employee) === area);
+        getGroupedEmployees(areaEmployees, area).forEach((group) => {
+            group.employees.forEach((employee, index) => {
+                employee.order = index;
+            });
+        });
+    });
+}
+
+function getNextEmployeeOrder(area, category, excludedEmployeeId = null) {
+    const matchingEmployees = state.employees.filter((employee) => (
+        employee.id !== excludedEmployeeId
+        && getEmployeeArea(employee) === area
+        && (area !== "boh" || getEmployeeCategory(employee) === category)
+    ));
+    return matchingEmployees.reduce((max, employee) => Math.max(max, getEmployeeOrder(employee)), -1) + 1;
 }
 
 function employeeCategoryLabel(employee) {
@@ -1412,9 +1444,11 @@ function renderEmployees() {
                         <p class="group-label">${escapeHtml(group.label)}</p>
                         <span>${group.employees.length} ${group.employees.length === 1 ? "employee" : "employees"}</span>
                     </div>
-                    ${group.employees.map((employee) => {
+                    ${group.employees.map((employee, index) => {
                         const minutes = getEmployeeMonthlyMinutes(employee.id, currentMonth);
                         const shifts = getEmployeeMonthlyShiftCount(employee.id, currentMonth);
+                        const canMoveUp = index > 0;
+                        const canMoveDown = index < group.employees.length - 1;
                         return `
                             <div class="employee-row">
                                 <div class="employee-meta">
@@ -1426,6 +1460,14 @@ function renderEmployees() {
                                     </div>
                                 </div>
                                 <div class="employee-actions">
+                                    <div class="employee-reorder" aria-label="Reorder ${escapeHtml(employee.name)}">
+                                        <button class="icon-button reorder-button" type="button" data-action="move-employee" data-direction="-1" data-id="${employee.id}" aria-label="Move ${escapeHtml(employee.name)} up" title="Move up" ${canMoveUp ? "" : "disabled"}>
+                                            <i data-lucide="chevron-up"></i>
+                                        </button>
+                                        <button class="icon-button reorder-button" type="button" data-action="move-employee" data-direction="1" data-id="${employee.id}" aria-label="Move ${escapeHtml(employee.name)} down" title="Move down" ${canMoveDown ? "" : "disabled"}>
+                                            <i data-lucide="chevron-down"></i>
+                                        </button>
+                                    </div>
                                     ${manager.area === "boh" ? renderEmployeeCategorySelect(employee) : ""}
                                     <span class="code-chip">${escapeHtml(employee.code)}</span>
                                     <button class="danger-button" type="button" data-action="remove-employee" data-id="${employee.id}" aria-label="Remove ${escapeHtml(employee.name)}" title="Remove employee">
@@ -1617,7 +1659,8 @@ function handleEmployeeSubmit(event) {
         code,
         color: employeeColors[state.employees.length % employeeColors.length],
         area,
-        category
+        category,
+        order: getNextEmployeeOrder(area, category)
     };
 
     state.employees.push(employee);
@@ -1632,9 +1675,15 @@ function fillGeneratedEmployeeCode() {
 }
 
 function handleEmployeeListClick(event) {
-    const button = event.target.closest("[data-action='remove-employee']");
-    if (!button) return;
-    removeEmployee(button.dataset.id);
+    const moveButton = event.target.closest("[data-action='move-employee']");
+    if (moveButton) {
+        moveEmployee(moveButton.dataset.id, Number(moveButton.dataset.direction));
+        return;
+    }
+
+    const removeButton = event.target.closest("[data-action='remove-employee']");
+    if (!removeButton) return;
+    removeEmployee(removeButton.dataset.id);
 }
 
 function handleEmployeeListChange(event) {
@@ -1643,13 +1692,40 @@ function handleEmployeeListChange(event) {
     const employee = getEmployee(select.dataset.id);
     if (!employee) return;
 
+    if (getEmployeeCategory(employee) === select.value) return;
     employee.area = "boh";
     employee.category = select.value;
+    employee.order = getNextEmployeeOrder("boh", select.value, employee.id);
+    normalizeEmployeeOrders(state.employees, "boh");
+    saveState();
+    renderEmployees();
+}
+
+function moveEmployee(employeeId, direction) {
+    const employee = getEmployee(employeeId);
+    const area = getCurrentManagerArea();
+    if (!employee || getEmployeeArea(employee) !== area || ![-1, 1].includes(direction)) return;
+
+    normalizeEmployeeOrders(state.employees, area);
+    const group = getGroupedEmployees(getManagerEmployees(), area)
+        .find((item) => item.employees.some((groupEmployee) => groupEmployee.id === employeeId));
+    if (!group) return;
+
+    const currentIndex = group.employees.findIndex((groupEmployee) => groupEmployee.id === employeeId);
+    const target = group.employees[currentIndex + direction];
+    if (!target) return;
+
+    const currentOrder = employee.order;
+    employee.order = target.order;
+    target.order = currentOrder;
+    normalizeEmployeeOrders(state.employees, area);
     saveState();
     renderEmployees();
 }
 
 function removeEmployee(employeeId) {
+    const employee = getEmployee(employeeId);
+    const area = employee ? getEmployeeArea(employee) : getCurrentManagerArea();
     state.employees = state.employees.filter((employee) => employee.id !== employeeId);
     delete state.availability[employeeId];
     Object.keys(state.shifts).forEach((dateKey) => {
@@ -1660,6 +1736,7 @@ function removeEmployee(employeeId) {
         currentUser = null;
         saveSession();
     }
+    normalizeEmployeeOrders(state.employees, area);
     saveState();
     render();
 }

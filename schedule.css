@@ -1355,6 +1355,29 @@ select:focus {
     gap: 0.5rem;
 }
 
+.employee-reorder {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.56);
+}
+
+.reorder-button {
+    width: 30px;
+    height: 30px;
+    min-height: 30px;
+    border-color: transparent;
+    background: transparent;
+}
+
+.reorder-button svg {
+    width: 16px;
+    height: 16px;
+}
+
 .category-select {
     width: auto;
     min-height: 32px;
@@ -1583,6 +1606,7 @@ svg {
     .day-panel,
     .employee-form,
     .employee-list .danger-button,
+    .employee-list .reorder-button,
     .calendar-controls,
     .hours-scroll-btn,
     .matrix-scroll-controls,
