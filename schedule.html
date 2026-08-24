@@ -11,16 +11,22 @@
 </head>
 <body class="is-loading">
 <div class="loading-screen" id="loadingScreen" role="status" aria-live="polite" aria-label="Loading Oak34 schedule">
-    <div class="loading-card">
-        <div class="loading-mark" aria-hidden="true">
-            <span class="loading-ring"></span>
-            <span class="loading-logo oak-logo-mark"></span>
+    <div class="loader-stage">
+        <div class="loader-logo-assembly" id="loaderLogoAssembly" aria-hidden="true">
+            <span class="loader-logo-final"></span>
+            <span class="loader-logo-piece piece-1"></span>
+            <span class="loader-logo-piece piece-2"></span>
+            <span class="loader-logo-piece piece-3"></span>
+            <span class="loader-logo-piece piece-4"></span>
+            <span class="loader-logo-piece piece-5"></span>
+            <span class="loader-logo-piece piece-6"></span>
+            <span class="loader-logo-piece piece-7"></span>
+            <span class="loader-logo-piece piece-8"></span>
         </div>
-        <div>
-            <p class="eyebrow">Oak34</p>
-            <strong>Kitchen Schedule</strong>
+        <div class="loader-progress" aria-hidden="true">
+            <span id="loaderPercent">0%</span>
+            <div class="loader-line"><span id="loaderProgressLine"></span></div>
         </div>
-        <div class="loading-bar" aria-hidden="true"><span></span></div>
     </div>
 </div>
 <div class="app-shell">

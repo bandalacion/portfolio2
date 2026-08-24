@@ -3,7 +3,11 @@
 const STORAGE_KEY = "portfolio2-scheduler-v1";
 const SESSION_KEY = "portfolio2-scheduler-session";
 const SYNC_ENDPOINT = "/api/scheduler";
-const MIN_LOADING_MS = 850;
+const MIN_LOADING_MS = 1850;
+const REPEAT_LOADING_MS = 1250;
+const MAX_LOADING_MS = 5200;
+const LOADER_FINISH_MS = 480;
+const LOADER_COMPLETE_HOLD_MS = 220;
 
 const managerAreas = {
     foh: {
@@ -86,7 +90,7 @@ let copiedDayShifts = null;
 let copiedWeekShifts = null;
 let activeShiftEditor = null;
 let loadingDismissed = false;
-const loadingStartedAt = performance.now();
+let loadingAnimationFrame = null;
 
 const dom = {};
 
@@ -95,8 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
     prepareFloatingShiftPopover();
     bindEvents();
     render();
-    hydrateRemoteState().finally(hideLoadingScreen);
-    setTimeout(hideLoadingScreen, 3800);
+    startPremiumLoader(hydrateRemoteState());
 });
 
 function captureDom() {
@@ -104,6 +107,8 @@ function captureDom() {
         "loginView",
         "appView",
         "loadingScreen",
+        "loaderPercent",
+        "loaderProgressLine",
         "loginForm",
         "loginMessage",
         "accessCode",
@@ -709,19 +714,162 @@ function renderSyncStatus() {
     dom.syncPill.className = `sync-pill ${syncStatus.type === "synced" ? "" : syncStatus.type}`;
 }
 
+function startPremiumLoader(startupPromise) {
+    if (!dom.loadingScreen) return;
+
+    const prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const hasSeenLoader = getSessionFlag("oak34-loader-seen") === "1";
+    const minDuration = prefersReducedMotion ? 600 : (hasSeenLoader ? REPEAT_LOADING_MS : MIN_LOADING_MS);
+    const maxDuration = prefersReducedMotion ? 2200 : MAX_LOADING_MS;
+    const startedAt = performance.now();
+    const logoPieces = Array.from(dom.loadingScreen.querySelectorAll(".loader-logo-piece"));
+    const finalLogo = dom.loadingScreen.querySelector(".loader-logo-final");
+    const pieceMotion = [
+        { x: -36, y: -18, r: -9, s: 0.08, delay: 0 },
+        { x: 30, y: -24, r: 8, s: -0.04, delay: 0.04 },
+        { x: -26, y: 8, r: 6, s: 0.05, delay: 0.08 },
+        { x: 34, y: 10, r: -7, s: 0.04, delay: 0.02 },
+        { x: -22, y: 28, r: -5, s: -0.05, delay: 0.1 },
+        { x: 26, y: 25, r: 6, s: 0.06, delay: 0.06 },
+        { x: -16, y: 38, r: 5, s: 0.03, delay: 0.14 },
+        { x: 22, y: 36, r: -6, s: -0.03, delay: 0.12 }
+    ];
+    let realReady = false;
+    let finishStartedAt = null;
+    let finishStartProgress = 0;
+    let displayedProgress = 0;
+    let waitingToExit = false;
+
+    Promise.allSettled([
+        startupPromise,
+        waitForFonts(),
+        waitForLogoAsset()
+    ]).then(() => {
+        realReady = true;
+    });
+
+    function frame(now) {
+        const elapsed = now - startedAt;
+        if (!finishStartedAt && ((realReady && elapsed >= minDuration) || elapsed >= maxDuration)) {
+            finishStartedAt = now;
+            finishStartProgress = displayedProgress;
+        }
+
+        if (finishStartedAt) {
+            const finishProgress = clamp01((now - finishStartedAt) / LOADER_FINISH_MS);
+            displayedProgress = finishStartProgress + ((1 - finishStartProgress) * easeOutCubic(finishProgress));
+        } else {
+            const cap = realReady ? 0.94 : 0.86;
+            const timeTarget = realReady
+                ? Math.min(cap, (elapsed / minDuration) * 0.94)
+                : Math.min(cap, (elapsed / maxDuration) * 0.86);
+            displayedProgress += (timeTarget - displayedProgress) * 0.14;
+        }
+
+        updatePremiumLoader(displayedProgress, logoPieces, finalLogo, pieceMotion, prefersReducedMotion);
+
+        if (finishStartedAt && displayedProgress >= 0.999) {
+            updatePremiumLoader(1, logoPieces, finalLogo, pieceMotion, prefersReducedMotion);
+            if (!waitingToExit) {
+                waitingToExit = true;
+                setSessionFlag("oak34-loader-seen", "1");
+                setTimeout(hideLoadingScreen, LOADER_COMPLETE_HOLD_MS);
+            }
+            return;
+        }
+
+        loadingAnimationFrame = requestAnimationFrame(frame);
+    }
+
+    updatePremiumLoader(0, logoPieces, finalLogo, pieceMotion, prefersReducedMotion);
+    loadingAnimationFrame = requestAnimationFrame(frame);
+}
+
+function updatePremiumLoader(progress, logoPieces, finalLogo, pieceMotion, prefersReducedMotion) {
+    const percent = Math.round(clamp01(progress) * 100);
+    if (dom.loaderPercent) dom.loaderPercent.textContent = `${percent}%`;
+    if (dom.loaderProgressLine) dom.loaderProgressLine.style.transform = `scaleX(${clamp01(progress)})`;
+
+    if (prefersReducedMotion) {
+        logoPieces.forEach((piece) => {
+            piece.style.transform = "none";
+            piece.style.opacity = "0";
+        });
+        if (finalLogo) finalLogo.style.opacity = "1";
+        return;
+    }
+
+    logoPieces.forEach((piece, index) => {
+        const motion = pieceMotion[index] || pieceMotion[0];
+        const localProgress = clamp01((progress - motion.delay) / (0.92 - motion.delay));
+        const assembled = easeInOutQuint(localProgress);
+        const scatter = 1 - assembled;
+        const drift = Math.sin((progress * 8) + index) * 1.2 * scatter;
+        const lift = Math.cos((progress * 6) + index) * 0.8 * scatter;
+        const scale = 1 + (motion.s * scatter);
+        piece.style.transform = `translate3d(${(motion.x * scatter) + drift}px, ${(motion.y * scatter) + lift}px, 0) rotate(${motion.r * scatter}deg) scale(${scale})`;
+        piece.style.opacity = String(1 - (0.46 * scatter));
+    });
+
+    if (finalLogo) {
+        finalLogo.style.opacity = String(clamp01((progress - 0.9) / 0.1));
+    }
+}
+
+function waitForFonts() {
+    if (!document.fonts || !document.fonts.ready) return Promise.resolve();
+    return document.fonts.ready;
+}
+
+function waitForLogoAsset() {
+    return new Promise((resolve) => {
+        const image = new Image();
+        image.onload = resolve;
+        image.onerror = resolve;
+        image.src = "assets/oak34-logo.png";
+        if (image.complete) resolve();
+    });
+}
+
+function getSessionFlag(key) {
+    try {
+        return sessionStorage.getItem(key);
+    } catch (error) {
+        return null;
+    }
+}
+
+function setSessionFlag(key, value) {
+    try {
+        sessionStorage.setItem(key, value);
+    } catch (error) {
+        // Ignore storage restrictions; the loader still works without this preference.
+    }
+}
+
+function clamp01(value) {
+    return Math.min(1, Math.max(0, value));
+}
+
+function easeOutCubic(value) {
+    return 1 - Math.pow(1 - clamp01(value), 3);
+}
+
+function easeInOutQuint(value) {
+    const t = clamp01(value);
+    return t < 0.5 ? 16 * t * t * t * t * t : 1 - (Math.pow(-2 * t + 2, 5) / 2);
+}
+
 function hideLoadingScreen() {
     if (loadingDismissed) return;
     loadingDismissed = true;
+    if (loadingAnimationFrame) cancelAnimationFrame(loadingAnimationFrame);
 
-    const elapsed = performance.now() - loadingStartedAt;
-    const delay = Math.max(0, MIN_LOADING_MS - elapsed);
+    document.body.classList.add("loading-done");
+    document.body.classList.remove("is-loading");
     setTimeout(() => {
-        document.body.classList.add("loading-done");
-        document.body.classList.remove("is-loading");
-        setTimeout(() => {
-            if (dom.loadingScreen) dom.loadingScreen.remove();
-        }, 500);
-    }, delay);
+        if (dom.loadingScreen) dom.loadingScreen.remove();
+    }, 520);
 }
 
 function updateSessionUi() {
