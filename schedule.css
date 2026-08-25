@@ -1121,6 +1121,9 @@ body.manager-schedule-view #nextMonthBtn {
 }
 
 .hours-table-wrap {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
     padding: 0.65rem;
     border: 1px solid var(--line);
@@ -2197,6 +2200,14 @@ body.manager-schedule-view #nextMonthBtn {
     min-width: 0;
 }
 
+.stack-view > *,
+.hours-surface,
+.hours-carousel,
+.hours-summary {
+    min-width: 0;
+    max-width: 100%;
+}
+
 #managerAvailabilityView .calendar-surface {
     width: 100%;
     max-width: 100%;
@@ -2948,6 +2959,10 @@ svg {
         display: none;
     }
 
+    .login-orb {
+        display: none;
+    }
+
     .sidebar {
         position: static;
     }
@@ -2985,7 +3000,14 @@ svg {
     }
 
     .export-mode select {
-        max-width: 135px;
+        width: 100%;
+        max-width: none;
+    }
+
+    .export-mode {
+        flex: 1 1 154px;
+        min-width: 154px;
+        padding-inline: 0.45rem;
     }
 
     .planner,
@@ -3125,13 +3147,20 @@ svg {
 
     .builder-person {
         align-items: flex-start;
+        flex-wrap: wrap;
     }
 
     .builder-person-status {
+        flex: 1 1 100%;
         min-width: 0;
-        max-width: none;
+        max-width: 100%;
         justify-items: start;
         text-align: left;
+    }
+
+    .builder-person-status small {
+        max-width: 100%;
+        white-space: normal;
     }
 
     .employee-row,
